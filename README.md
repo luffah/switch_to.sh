@@ -1,5 +1,5 @@
 # switch_to.sh
-A simple script that allows to jumb between nammed windows in Xorg.
+A simple script that allows to jump between nammed windows in Xorg.
 ```
 Usage : switch_to.sh [-t|--terminal] <app_name> [<app_cmd>]
 	-t|--terminal	auto name a terminal with the suffix <app_name>
