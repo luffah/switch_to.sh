@@ -3,15 +3,15 @@
 ###
 #### Simple script that allows to jump to between named windows
 ###
-###  by luffah <www.luffah.xyz>
+###  by luffah <contact@luffah.xyz>
 ###
 ###  Licensed under GPLv3. 
 ###  Free as in freedom.
 ###  Free to use. Free to share. Free to modify. Free to verify.
-#logfile="/tmp/switch_to.log"
-logfile="/dev/stdout"
+logfile="/tmp/switch_to.log"
+# logfile="/dev/stdout"
 # Put something inside DEBUG to have logs
-DEBUG=""
+DEBUG="true"
 logthis(){
 	[ -n "${DEBUG}" ] && echo "`date` $*" >> ${logfile}
 }
@@ -32,16 +32,67 @@ then
 fi
 
 # If -t option is used, then you need a terminal definition which have -T (-title( option)
-defterm="x-terminal-emulator"
-find_name_able_term(){
-  ok="`${defterm} --help 2> /dev/null | grep -- -T`"
-  if [ -z "${ok}" ]
-  then
-    which lxterminal > /dev/null && defterm=lxterminal || \
-      which mate-terminal > /dev/null && defterm=xterm || \
-      which xterm > /dev/null && defterm=xterm
-  fi
+defterm=`readlink /etc/alternatives/x-terminal-emulator | xargs basename`
+open_nammed_terminal(){
+  case ${defterm} in
+    lxterminal|st|mate-terminal|xterm);;
+    *)
+      ok="`${defterm} --help 2> /dev/null | grep -- -T`"
+      if [ -z "${ok}" ]
+      then
+          which st > /dev/null && defterm=st || \
+          which lxterminal > /dev/null && defterm=lxterminal  || \
+          which mate-terminal > /dev/null && defterm=xterm || \
+          which xterm > /dev/null && defterm=xterm
+      fi
+      ;;
+  esac
+  case ${defterm} in
+    st)
+     opt="-t $1 -c $1"
+      ;;
+    *)
+      opt="-T $1"
+      ;;
+  esac
   logthis "Using ${defterm}."
+  echo "${defterm} ${opt}"
+}
+
+new_window(){
+  eval "${wprog}" &
+  sleep .3s
+  window_to_activate="`xdotool getactivewindow`"
+
+  logthis "window_to_activate=${window_to_activate}" 
+
+  if [ -n "${window_to_activate}" ]
+  then 
+    RET=`xdotool windowactivate "${window_to_activate}" 2>&1 | grep "failed"`
+    return `test -z "${RET}"; echo $?`
+  fi
+}
+
+activate_window(){
+  if [ -z "${window_to_activate}" ]
+  then
+    return 1
+  fi
+  logthis "def window_to_activate=${window_to_activate}" 
+
+  if [ "${current_active_wid}" = "${window_to_activate}" ]
+  then
+    LOCAL_ACTIVE_WID="${current_active_wid}"
+    window_to_activate="${LAST_ACTIVE_WID}"
+  fi
+
+  logthis "window_to_activate=${window_to_activate}" 
+
+  if [ -n "${window_to_activate}" ]
+  then 
+    RET=`xdotool windowactivate "${window_to_activate}" 2>&1 | grep "failed"`
+    return `test -z "${RET}"; echo $?`
+  fi
 }
 
 ### Arguments parsing ###
@@ -79,8 +130,7 @@ if [ -n "${wprog}" ];  then
 #  logthis "Orig cmd	: ${wprog}"
   wprog="`echo \"${wprog}\" | sed \"s/%title/\\\"${wname}\\\"/g\"`"
 else
-  find_name_able_term
-  [ -n "${termmode}" ] && wprog="${defterm} -T ${wname}" || wprog="${wname}"
+  [ -n "${termmode}" ] && wprog="`open_nammed_terminal ${wname}`" || wprog="${wname}"
 fi
 logthis "Name     : ${wname}"
 logthis "Command  : ${wprog}"
@@ -97,39 +147,18 @@ LAST_ACTIVE_WID="`[ -f ${LAST_ACTIVE_WID_file} ] && cat \"${LAST_ACTIVE_WID_file
 ####
 
 current_active_wid="`xdotool getactivewindow`"
-
-logthis "def current_active_wid=${current_active_wid}" 
+logthis "current_active_wid=${current_active_wid}" 
 
 window_to_activate="${LOCAL_ACTIVE_WID}"
-[ -z "${window_to_activate}" ] &&\
- window_to_activate="`xdotool search -name \"${wname}\" | tail -1`"
+activate_window || \
+ window_to_activate="`xdotool search -classname \"${wname}\" | tail -1`" \
+ activate_window || \
+ window_to_activate="`xdotool search -name \"${wname}\" | tail -1`" \
+ activate_window  || \
+ new_window
 
-[ -z "${window_to_activate}" ] &&\
- window_to_activate="`xdotool search \"${wname}\" | tail -1`"
-
-logthis "def window_to_activate=${window_to_activate}" 
-
-if [ "${current_active_wid}" = "${window_to_activate}" ]
-then
-	LOCAL_ACTIVE_WID="${current_active_wid}"
-	window_to_activate="${LAST_ACTIVE_WID}"
-fi
-
-if [ -z "${window_to_activate}" ]
-then
-  eval "${wprog}" &
-  sleep .3s
-  window_to_activate="`xdotool search -name \"${wname}\" | tail -1`"
-fi
 LAST_ACTIVE_WID="${current_active_wid}"
 
-logthis "current_active_wid=${current_active_wid}" 
-logthis "window_to_activate=${window_to_activate}" 
-
-if [ -n "${window_to_activate}" ]
-then 
-	xdotool windowactivate "${window_to_activate}"
-fi
 ## export globals ###
 echo "${LAST_ACTIVE_WID}" > ${LAST_ACTIVE_WID_file}
 #####################
