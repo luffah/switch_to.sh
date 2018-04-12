@@ -1,8 +1,9 @@
 # switch_to.sh
 A simple script that allows to jump to a nammed window in Xorg and to jump back to the original window.
 ```
-Usage : switch_to.sh [-t|--terminal] <app_name> [<app_cmd>]
+Usage : switch_to.sh [-m x y w h][-t|--terminal] <app_name> [<app_cmd>]
 	-t|--terminal	auto title a terminal with the suffix <app_name>
+	-m|--move	move/resize (X,Y,width,height e.g. 0 50% 50% 100%)
 	<app_name>	shall be a quoted string if it contains spac
 	<app_cmd>	can contain %title which will be remplaced by <app_name> or the title of the window when the option -t is provided
 ```

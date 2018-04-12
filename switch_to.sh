@@ -24,8 +24,9 @@ then
 fi
 if [ -z "$1" ]
 then
-  echo "Usage : $0 [-t|--terminal] <app_name> [<app_cmd>]"
+  echo "Usage : `basename $0` [-m <x> <y> <w> <h>] [-t|--terminal] <app_name> [<app_cmd>]"
   echo  "	-t|--terminal	auto name a terminal with the suffix <app_name>"
+  echo  "	-m|--move	move/resize (X,Y,width,height e.g. 0 50% 50% 100%)"
   echo  "	<app_name>	shall be a quoted string if it contains spac"
   echo  "	<app_cmd>	can contain %title which will be remplaced by <app_name> or the title of the window when the option -t is provided"
   exit 1
@@ -49,10 +50,10 @@ open_nammed_terminal(){
   esac
   case ${defterm} in
     st)
-     opt="-t $1 -c $1"
+      opt="-t \"$1\" -c $1"
       ;;
     *)
-      opt="-T $1"
+      opt="-T \"$1\""
       ;;
   esac
   logthis "Using ${defterm}."
@@ -60,8 +61,11 @@ open_nammed_terminal(){
 }
 
 new_window(){
-  eval "${wprog}" &
-  sleep .3s
+  # eval "${wprog}" &
+  eval ${wprog} &
+  # window_to_activate="`xdotool search --sync --pid $!`"
+
+  sleep .8s
   window_to_activate="`xdotool getactivewindow`"
 
   logthis "window_to_activate=${window_to_activate}" 
@@ -98,20 +102,31 @@ activate_window(){
 ### Arguments parsing ###
 termprefix=".t."
 termode=""
+change_coord=""
+while true; do
 case "$1" in 
   --terminal|-t)
     termmode="$1"
     shift
     ;;
-esac
-case "$1" in 
   --terminal-prefix|-tp)
     termmode="$1"
-    shift
-    termprefix="$1"
-    shift
+    termprefix="$2"
+    shift 2
+    ;;
+  --move|-m)
+    change_coord="$1"
+    coord="$2 $3"
+    # y="$3"
+    winsize="$4 $5"
+    # h="$5"
+    shift 5
+    ;;
+  *)
+    break
     ;;
 esac
+done
 wname="$1"
 shift
 wprog=""
@@ -156,6 +171,12 @@ activate_window || \
  window_to_activate="`xdotool search -name \"${wname}\" | tail -1`" \
  activate_window  || \
  new_window
+
+
+if [ -n "${change_coord}" -a -n "${window_to_activate}" ]; then
+   xdotool windowmove ${window_to_activate} ${coord}
+   xdotool windowsize ${window_to_activate} ${winsize}
+fi
 
 LAST_ACTIVE_WID="${current_active_wid}"
 
