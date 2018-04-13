@@ -8,10 +8,20 @@
 ###  Licensed under GPLv3. 
 ###  Free as in freedom.
 ###  Free to use. Free to share. Free to modify. Free to verify.
-logfile="/tmp/switch_to.log"
-# logfile="/dev/stdout"
+
+### variables ###
+termprefix=".t."
+termsuffix="."
+termode=""
+change_coord=""
+force_resize=""
+noexec=""
+activation_delay="0.6s"
+
+# logfile="/tmp/switch_to.log"
+# logfile="/dev/stderr"
 # Put something inside DEBUG to have logs
-DEBUG="true"
+# DEBUG="true"
 logthis(){
 	[ -n "${DEBUG}" ] && echo "`date` $*" >> ${logfile}
 }
@@ -24,11 +34,31 @@ then
 fi
 if [ -z "$1" ]
 then
-  echo "Usage : `basename $0` [-m <x> <y> <w> <h>] [-t|--terminal] <app_name> [<app_cmd>]"
-  echo  "	-t|--terminal	auto name a terminal with the suffix <app_name>"
-  echo  "	-m|--move	move/resize (X,Y,width,height e.g. 0 50% 50% 100%)"
-  echo  "	<app_name>	shall be a quoted string if it contains spac"
-  echo  "	<app_cmd>	can contain %title which will be remplaced by <app_name> or the title of the window when the option -t is provided"
+  grt="$(tput setaf 2; tput bold; tput smul)"
+  gre="$(tput setaf 2; tput bold; tput rmul)"
+  gxt="$(tput setaf 2; tput bold; tput rmul)"
+  mag=`tput setaf 5`
+  yel=`tput setaf 3`
+  yol=`tput setaf 6`
+  rs=`tput sgr0`
+  echo "${grt}Usage${gre} :${rs} ${mag}`basename $0` ${yel} <app_name> ${rs}"
+  echo "     ${gre} :${rs} ${mag}`basename $0` ${yel} <app_name> <app_cmd>${rs}"
+  echo "     ${gre} :${rs} ${mag}`basename $0` ${yel}${rs}[${yol}<options>${rs}]${yel} <app_name> ${rs}[${yel}<app_cmd>${rs}]"
+  echo "     ${gre} :${rs} ${mag}`basename $0` ${rs}[${yol}-m${rs} ${yel}<x> <y> <w> <h>${rs}] [${yol}-t${rs}]${yel}  <app_name> ${rs}[${yel}<app_cmd>${rs}]"
+  echo
+  echo "${grt}Arguments${rs} :"
+  echo " ${yel}<app_name>${rs}	shall be a quoted string if it contains spac"
+  echo " ${yel}<app_cmd>${rs}	can contain %title which will be remplaced by <app_name> or the title of the window when the option -t is provided"
+  echo ${yol}${rs}
+  echo "${grt}Options${rs} :"
+  echo " ${yol}-t ${rs}|${yol}--terminal${rs}	auto name a terminal \"${termprefix}<app_name>${termsuffix}\""
+  echo " ${yol}-tp${rs}|${yol}--terminal-prefix${rs}	change the terminal prefix (\"${termprefix}\")"
+  echo " ${yol}-ts${rs}|${yol}--terminal-suffix${rs}	change the terminal suffix (\"${termsuffix}\")"
+  echo " ${yol}-m ${rs}|${yol}--move${rs}	${yel}<x> <y> <w> <h>${rs}"
+  echo "          ${rs}	move/resize (X,Y,width,height e.g. 0 50% 50% 100%)"
+  echo " ${yol}-p ${rs}|${yol}--place${rs}	[new window] move/resize (X,Y,width,height e.g. 0 50% 50% 100%)"
+  echo " ${yol}-d ${rs}|${yol}--delay${rs}	[new window] delay before switching to or resizing the window (${activation_delay})"
+  echo " ${yol}-n ${rs}|${yol}--no-exec${rs}	don't create any new window"
   exit 1
 fi
 
@@ -56,25 +86,45 @@ open_nammed_terminal(){
       opt="-T \"$1\""
       ;;
   esac
-  logthis "Using ${defterm}."
+  logthis "Using -- ${defterm} ${opt} --"
   echo "${defterm} ${opt}"
 }
 
 new_window(){
-  # eval "${wprog}" &
-  eval ${wprog} &
-  # window_to_activate="`xdotool search --sync --pid $!`"
-
-  sleep .8s
-  window_to_activate="`xdotool getactivewindow`"
-
+  RET="failed"
+  eval "${wprog} &" && PID=$!
+  logthis "PID=${PID}"
+  # wait the programm to change pid ...
+  sleep ${activation_delay}
+  if ps -p $PID > /dev/null; then
+    echo "present"
+  else
+    PID=""
+  fi
+  # while [ -z "${window_to_activate}" -o "${window_to_activate}" = "${current_active_wid}" ]
+  # do
+  if [ -n "${PID}" ]; then
+      window_to_activate="`xdotool search --pid ${PID} --sync`"
+  else
+    window_to_activate="`xdotool search --classname \"${wname}\" | tail -1`"
+    if [ -z "${window_to_activate}" ]; then
+         window_to_activate="`xdotool search --name \"${wname}\" | tail -1 `"
+      fi
+  fi
+  # window_to_activate="`xdotool getactivewindow`"
+  # done
   logthis "window_to_activate=${window_to_activate}" 
 
   if [ -n "${window_to_activate}" ]
   then 
     RET=`xdotool windowactivate "${window_to_activate}" 2>&1 | grep "failed"`
-    return `test -z "${RET}"; echo $?`
+
+    if [ -n "${change_coord}" -a -n "${window_to_activate}" ]; then
+      xdotool windowmove ${window_to_activate} ${coord}
+      xdotool windowsize ${window_to_activate} ${winsize}
+    fi
   fi
+  return `test -z "${RET}"; echo $?`
 }
 
 activate_window(){
@@ -86,8 +136,9 @@ activate_window(){
 
   if [ "${current_active_wid}" = "${window_to_activate}" ]
   then
-    LOCAL_ACTIVE_WID="${current_active_wid}"
+    # LOCAL_ACTIVE_WID="${current_active_wid}"
     window_to_activate="${LAST_ACTIVE_WID}"
+    not_back=""
   fi
 
   logthis "window_to_activate=${window_to_activate}" 
@@ -100,27 +151,43 @@ activate_window(){
 }
 
 ### Arguments parsing ###
-termprefix=".t."
-termode=""
-change_coord=""
 while true; do
 case "$1" in 
   --terminal|-t)
     termmode="$1"
     shift
     ;;
+  --delay|-d)
+    if [ -n "${2}" ]; then
+    activation_delay="$2"
+    shift 2
+    fi
+    ;;
   --terminal-prefix|-tp)
     termmode="$1"
     termprefix="$2"
     shift 2
     ;;
-  --move|-m)
+  --place|-p)
     change_coord="$1"
     coord="$2 $3"
     # y="$3"
     winsize="$4 $5"
     # h="$5"
     shift 5
+    ;;
+  --move|-m)
+    force_resize="1"
+    change_coord="$1"
+    coord="$2 $3"
+    # y="$3"
+    winsize="$4 $5"
+    # h="$5"
+    shift 5
+    ;;
+  --no-exec|-n)
+    noexec="1"
+    shift
     ;;
   *)
     break
@@ -130,6 +197,12 @@ done
 wname="$1"
 shift
 wprog=""
+# Globals
+win_found=""
+not_back="1"
+window_to_activate=""
+current_active_wid=""
+LAST_ACTIVE_WID=""
 while [ -n "$1" ]
 do
 #  logthis "Param	: $1"
@@ -140,7 +213,7 @@ do
 done
 [ -z "${wname}" ] && echo "No window name provided. Exit." && exit 1
 
-[ -n "${termmode}" ] && wname="${termprefix}${wname}."
+[ -n "${termmode}" ] && wname="${termprefix}${wname}${termsuffix}"
 if [ -n "${wprog}" ];  then
 #  logthis "Orig cmd	: ${wprog}"
   wprog="`echo \"${wprog}\" | sed \"s/%title/\\\"${wname}\\\"/g\"`"
@@ -152,35 +225,42 @@ logthis "Command  : ${wprog}"
 ###
 
 ### Variables ###
-LOCAL_ACTIVE_WID=""
+# LOCAL_ACTIVE_WID=""
 
-## import globals ###
-# Window to activate if are already and the asked window (switch)
-LAST_ACTIVE_WID_file="/tmp/LAST_`echo ${wname} | tr -d '\\ /'`_WID"
-LAST_ACTIVE_WID="`[ -f ${LAST_ACTIVE_WID_file} ] && cat \"${LAST_ACTIVE_WID_file}\"`"
-
-####
-
-current_active_wid="`xdotool getactivewindow`"
-logthis "current_active_wid=${current_active_wid}" 
-
-window_to_activate="${LOCAL_ACTIVE_WID}"
-activate_window || \
- window_to_activate="`xdotool search -classname \"${wname}\" | tail -1`" \
- activate_window || \
- window_to_activate="`xdotool search -name \"${wname}\" | tail -1`" \
- activate_window  || \
- new_window
-
-
-if [ -n "${change_coord}" -a -n "${window_to_activate}" ]; then
-   xdotool windowmove ${window_to_activate} ${coord}
-   xdotool windowsize ${window_to_activate} ${winsize}
+if [ -z "${noexec}" ]; then
+  ## import globals ###
+  # Window to activate if are already and the asked window (switch)
+  LAST_ACTIVE_WID_file="/tmp/LAST_`echo ${wname} | tr -d '\\ /'`_WID"
+  LAST_ACTIVE_WID="`[ -f ${LAST_ACTIVE_WID_file} ] && cat \"${LAST_ACTIVE_WID_file}\"`"
+  ####
+  current_active_wid="`xdotool getactivewindow`"
+  logthis "current_active_wid=${current_active_wid}" 
 fi
+
+# if [ -z "${noexec}" ] ; then
+#   window_to_activate="${LOCAL_ACTIVE_WID}"
+# fi
+# if [ -z "${window_to_activate}" ]; then ; fi
+
+onlyvisible="--onlyvisible"
+
+activate_window || \
+ window_to_activate="`xdotool search  ${onlyvisible} -classname \"${wname}\" | tail -1`" \
+ activate_window || \
+ window_to_activate="`xdotool search  ${onlyvisible} -name \"${wname}\" | tail -1`" \
+ activate_window || \
+ test -n "${noexec}" || new_window
 
 LAST_ACTIVE_WID="${current_active_wid}"
 
+if [ -n "${force_resize}" -a -n "${not_back}" -a -n "${change_coord}" -a -n "${window_to_activate}" ]; then
+  xdotool windowmove ${window_to_activate} ${coord}
+  xdotool windowsize ${window_to_activate} ${winsize}
+fi
+
 ## export globals ###
-echo "${LAST_ACTIVE_WID}" > ${LAST_ACTIVE_WID_file}
+if [ -z "${noexec}" ]; then
+  echo "${LAST_ACTIVE_WID}" > ${LAST_ACTIVE_WID_file}
+fi
 #####################
 
