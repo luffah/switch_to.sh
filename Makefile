@@ -3,7 +3,7 @@ deps:
 
 test:
 	sh ./switch_to.sh -d .1 -p 0 0 50% 50% -t "Testing script switch_to.sh"  \
- xterm -T %title  -e 'sleep 0.3; echo The test is ok;sleep 1; echo Now the installation can start;sleep 1'
+ xterm -T %title  -e 'sleep 0.3; echo Testing window placement;sleep 1; echo Testing window list; sh ./switch_to.sh -l . ; echo Now the installation can start;sleep 2'
 	sleep .4 && \
  sh ./switch_to.sh -m 50% 50% 50% 50% -n -t "Testing script switch_to.sh"
 

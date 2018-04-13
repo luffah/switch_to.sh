@@ -9,7 +9,23 @@
 ###  Free as in freedom.
 ###  Free to use. Free to share. Free to modify. Free to verify.
 
-### variables ###
+# logfile="/tmp/switch_to.log"
+# logfile="/dev/stderr"
+# Put something inside DEBUG to have logs
+# DEBUG="true"
+
+logthis(){
+	[ -n "${DEBUG}" ] && echo "`date` $*" >> ${logfile}
+}
+
+# XdoTool is required
+which xdotool > /dev/null
+if [ "$?" -gt 0 ]; then
+  echo "Missing 'xdotool' to run this script"
+  exit 1
+fi
+
+### Parameters variables ###
 termprefix=".t."
 termsuffix="."
 termode=""
@@ -18,29 +34,25 @@ force_resize=""
 noexec=""
 activation_delay="0.6s"
 
-# logfile="/tmp/switch_to.log"
-# logfile="/dev/stderr"
-# Put something inside DEBUG to have logs
-# DEBUG="true"
-logthis(){
-	[ -n "${DEBUG}" ] && echo "`date` $*" >> ${logfile}
-}
+### Globals processing variables ###
+win_found=""
+not_back="1"
+window_to_activate=""
+current_active_wid=""
+LAST_ACTIVE_WID=""
 
-# XdoTool is required
-which xdotool > /dev/null
-if [ "$?" -gt 0 ]
+### Styles for terminal
+grt="$(tput setaf 2; tput bold; tput smul)"
+gre="$(tput setaf 2; tput bold; tput rmul)"
+gxt="$(tput setaf 2; tput bold; tput rmul)"
+mag=`tput setaf 5`
+yel=`tput setaf 3`
+yol=`tput setaf 6`
+rs=`tput sgr0`
+
+### If no parameter
+if [ -z "$1" -o "$1" = "-h" ]
 then
-  echo "Missing 'xdotool' to run this script"
-fi
-if [ -z "$1" ]
-then
-  grt="$(tput setaf 2; tput bold; tput smul)"
-  gre="$(tput setaf 2; tput bold; tput rmul)"
-  gxt="$(tput setaf 2; tput bold; tput rmul)"
-  mag=`tput setaf 5`
-  yel=`tput setaf 3`
-  yol=`tput setaf 6`
-  rs=`tput sgr0`
   echo "${grt}Usage${gre} :${rs} ${mag}`basename $0` ${yel} <app_name> ${rs}"
   echo "     ${gre} :${rs} ${mag}`basename $0` ${yel} <app_name> <app_cmd>${rs}"
   echo "     ${gre} :${rs} ${mag}`basename $0` ${yel}${rs}[${yol}<options>${rs}]${yel} <app_name> ${rs}[${yel}<app_cmd>${rs}]"
@@ -136,7 +148,6 @@ activate_window(){
 
   if [ "${current_active_wid}" = "${window_to_activate}" ]
   then
-    # LOCAL_ACTIVE_WID="${current_active_wid}"
     window_to_activate="${LAST_ACTIVE_WID}"
     not_back=""
   fi
@@ -189,78 +200,94 @@ case "$1" in
     noexec="1"
     shift
     ;;
-  *)
-    break
-    ;;
+  --list|-l)
+    # noexec="1
+
+     # example : ./switch_to.sh -l '\.t\..*\.'
+     if [ "$2" ]; then
+       echo "${mag}WINDOWID ${gxt} PID    ${rs}${yol} WM_CLASS       ${yel} WM_NAME ${rs}"
+       echo "${mag}--------|${gxt}|------|${rs}${yol}|--------------|${yel}|--------${rs}"
+     xdotool search --onlyvisible --name "$2" | while read i
+     do
+       status="`xprop -id ${i} | egrep '_NET_WM_NAME|WM_CLASS|_NET_WM_DESKTOP'`"
+       progclass="`echo \"${status}\" | grep 'WM_CLASS' | cut -d'=' -f2- `"
+       progname="`echo \"${status}\" | grep '_NET_WM_NAME' | cut -d'=' -f2- `"
+       activ="`echo \"${status}\" | grep '_NET_WM_DESKTOP' `"
+       PID="`xdotool getwindowpid ${i}`"
+       if [ "${activ}" ]; then
+         echo "${mag}${i} ${gxt} ${PID} ${rs}${yol} ${progclass} ${yel} ${progname} ${rs}"
+       fi
+     done
+   fi
+   exit 0
+   # shift
+   ;;
+ *)
+   break
+   ;;
 esac
 done
+### Processing
+# last 2 args : Window name and program
 wname="$1"
-shift
-wprog=""
-# Globals
-win_found=""
-not_back="1"
-window_to_activate=""
-current_active_wid=""
-LAST_ACTIVE_WID=""
-while [ -n "$1" ]
-do
-#  logthis "Param	: $1"
- echo "$1" | grep ' ' > /dev/null \
-  && wprog="${wprog} \"`echo "${1}" | sed 's/"/\\\"/g'`\"" \
-  || wprog="${wprog} ${1}"
- shift
-done
-[ -z "${wname}" ] && echo "No window name provided. Exit." && exit 1
+if [ -n "${wname}" ];then
+  shift
+  wprog=""
+  while [ -n "$1" ]
+  do
+    #  logthis "Param	: $1"
+    echo "$1" | grep ' ' > /dev/null \
+      && wprog="${wprog} \"`echo "${1}" | sed 's/"/\\\"/g'`\"" \
+      || wprog="${wprog} ${1}"
+    shift
+  done
+  [ -n "${termmode}" ] && wname="${termprefix}${wname}${termsuffix}"
+  if [ -n "${wprog}" -a -z "${noexec}" ];  then
+    #  logthis "Orig cmd	: ${wprog}"
+    wprog="`echo \"${wprog}\" | sed \"s/%title/\\\"${wname}\\\"/g\"`"
+  else
+    [ -n "${termmode}" ] && wprog="`open_nammed_terminal ${wname}`" || wprog="${wname}"
+  fi
+  logthis "Name     : ${wname}"
+  logthis "Command  : ${wprog}"
+  ###
+  if [ -z "${noexec}" ]; then
+    ## import globals ###
+    # Window to activate if are already and the asked window (switch)
+    LAST_ACTIVE_WID_file="/tmp/LAST_`echo ${wname} | tr -d '\\ /'`_WID"
+    LAST_ACTIVE_WID="`[ -f ${LAST_ACTIVE_WID_file} ] && cat \"${LAST_ACTIVE_WID_file}\"`"
+    ####
+    current_active_wid="`xdotool getactivewindow`"
+    logthis "current_active_wid=${current_active_wid}"
+  fi
+  onlyvisible="--onlyvisible"
 
-[ -n "${termmode}" ] && wname="${termprefix}${wname}${termsuffix}"
-if [ -n "${wprog}" ];  then
-#  logthis "Orig cmd	: ${wprog}"
-  wprog="`echo \"${wprog}\" | sed \"s/%title/\\\"${wname}\\\"/g\"`"
+  activate_window || \
+    window_to_activate="`xdotool search  ${onlyvisible} -classname \"${wname}\" | tail -1`" \
+    activate_window || \
+    window_to_activate="`xdotool search  ${onlyvisible} -name \"${wname}\" | tail -1`" \
+    activate_window || \
+    test -n "${noexec}" || new_window
+
+  LAST_ACTIVE_WID="${current_active_wid}"
+
+  ## export globals ###
+  if [ -z "${noexec}" ]; then
+    echo "${LAST_ACTIVE_WID}" > ${LAST_ACTIVE_WID_file}
+  fi
+  if [ -n "${force_resize}" -a -n "${not_back}" -a -n "${change_coord}" -a -n "${window_to_activate}" ]; then
+    xdotool windowmove ${window_to_activate} ${coord}
+    xdotool windowsize ${window_to_activate} ${winsize}
+  fi
+elif [ -z "${noexec}" ]; then
+  echo "No window name provided. Exit." && exit 1
 else
-  [ -n "${termmode}" ] && wprog="`open_nammed_terminal ${wname}`" || wprog="${wname}"
-fi
-logthis "Name     : ${wname}"
-logthis "Command  : ${wprog}"
-###
-
-### Variables ###
-# LOCAL_ACTIVE_WID=""
-
-if [ -z "${noexec}" ]; then
-  ## import globals ###
-  # Window to activate if are already and the asked window (switch)
-  LAST_ACTIVE_WID_file="/tmp/LAST_`echo ${wname} | tr -d '\\ /'`_WID"
-  LAST_ACTIVE_WID="`[ -f ${LAST_ACTIVE_WID_file} ] && cat \"${LAST_ACTIVE_WID_file}\"`"
-  ####
-  current_active_wid="`xdotool getactivewindow`"
-  logthis "current_active_wid=${current_active_wid}" 
-fi
-
-# if [ -z "${noexec}" ] ; then
-#   window_to_activate="${LOCAL_ACTIVE_WID}"
-# fi
-# if [ -z "${window_to_activate}" ]; then ; fi
-
-onlyvisible="--onlyvisible"
-
-activate_window || \
- window_to_activate="`xdotool search  ${onlyvisible} -classname \"${wname}\" | tail -1`" \
- activate_window || \
- window_to_activate="`xdotool search  ${onlyvisible} -name \"${wname}\" | tail -1`" \
- activate_window || \
- test -n "${noexec}" || new_window
-
-LAST_ACTIVE_WID="${current_active_wid}"
-
-if [ -n "${force_resize}" -a -n "${not_back}" -a -n "${change_coord}" -a -n "${window_to_activate}" ]; then
-  xdotool windowmove ${window_to_activate} ${coord}
-  xdotool windowsize ${window_to_activate} ${winsize}
-fi
-
-## export globals ###
-if [ -z "${noexec}" ]; then
-  echo "${LAST_ACTIVE_WID}" > ${LAST_ACTIVE_WID_file}
+  # if no parameter, process the current window
+  window_to_activate="`xdotool getactivewindow`"
+  if [ -n "${force_resize}" -a  -n "${change_coord}" -a -n "${window_to_activate}" ]; then
+      xdotool windowmove ${window_to_activate} ${coord}
+      xdotool windowsize ${window_to_activate} ${winsize}
+  fi
 fi
 #####################
 
