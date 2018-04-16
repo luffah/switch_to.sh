@@ -59,8 +59,13 @@ then
   echo "     ${gre} :${rs} ${mag}`basename $0` ${rs}[${yol}-m${rs} ${yel}<x> <y> <w> <h>${rs}] [${yol}-t${rs}]${yel}  <app_name> ${rs}[${yel}<app_cmd>${rs}]"
   echo
   echo "${grt}Arguments${rs} :"
-  echo " ${yel}<app_name>${rs}	shall be a quoted string if it contains spac"
-  echo " ${yel}<app_cmd>${rs}	can contain %title which will be remplaced by <app_name> or the title of the window when the option -t is provided"
+  echo " ${yel}<app_name>${rs}	either executable, window title or window class"
+  echo "           	-> shall be a quoted string if it contains any space"
+  echo
+  echo " ${yel}<app_cmd>${rs}	command line for launching the application"
+  echo "          	-> can contain ${yel}%title${rs} which will be remplaced by"
+  echo "          	   the window title (${yel}<app_name>${rs} or"
+  echo "          	   the title computed when using option ${yol}-t${rs})"
   echo ${yol}${rs}
   echo "${grt}Options${rs} :"
   echo " ${yol}-t ${rs}|${yol}--terminal${rs}	auto name a terminal \"${termprefix}<app_name>${termsuffix}\""
@@ -71,6 +76,9 @@ then
   echo " ${yol}-p ${rs}|${yol}--place${rs}	[new window] move/resize (X,Y,width,height e.g. 0 50% 50% 100%)"
   echo " ${yol}-d ${rs}|${yol}--delay${rs}	[new window] delay before switching to or resizing the window (${activation_delay})"
   echo " ${yol}-n ${rs}|${yol}--no-exec${rs}	don't create any new window"
+  echo "${grt}Tricky options${rs} :"
+  echo " ${yol}${yol}--percent${rs}	[before --move or --place] force coordonates in percent"
+  echo " ${yol}-mc${rs}|${yol}-pc${rs}	short options for '--percent --move' and '--percent --place'${rs}"
   exit 1
 fi
 
