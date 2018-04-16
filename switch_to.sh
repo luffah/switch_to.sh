@@ -132,8 +132,8 @@ new_window(){
     RET=`xdotool windowactivate "${window_to_activate}" 2>&1 | grep "failed"`
 
     if [ -n "${change_coord}" -a -n "${window_to_activate}" ]; then
-      xdotool windowmove ${window_to_activate} ${coord}
-      xdotool windowsize ${window_to_activate} ${winsize}
+    xdotool windowmove ${window_to_activate} ${coordx} ${coordy}
+    xdotool windowsize ${window_to_activate} ${sizew} ${sizeh}
     fi
   fi
   return `test -z "${RET}"; echo $?`
@@ -179,21 +179,41 @@ case "$1" in
     termprefix="$2"
     shift 2
     ;;
-  --place|-p)
+  --place|-p|-pc)
+    if [ "$1" = "-pc" ]; then percent_place="$1"; fi
     change_coord="$1"
-    coord="$2 $3"
-    # y="$3"
-    winsize="$4 $5"
-    # h="$5"
+    if [ "${percent_place}" ]; then
+      coordx=`echo $2 | sed 's/%\?$/%/'`
+      coordy=`echo $3 | sed 's/%\?$/%/'`
+      sizew=`echo $4 | sed 's/%\?$/%/'`
+      sizeh=`echo $5 | sed 's/%\?$/%/'`
+    else
+      coordx=`echo $2 | sed 's/^0$/0%/'`
+      coordy=`echo $3 | sed 's/^0$/0%/'`
+      sizew=`echo $4 | sed 's/^0$/0%/'`
+      sizeh=`echo $5 | sed 's/^0$/0%/'`
+    fi
     shift 5
     ;;
-  --move|-m)
+  --percent)
+    percent_place="$1"
+    shift 1
+    ;;
+  --move|-m|-mc)
+    if [ "$1" = "-mc" ]; then percent_place="$1"; fi
     force_resize="1"
     change_coord="$1"
-    coord="$2 $3"
-    # y="$3"
-    winsize="$4 $5"
-    # h="$5"
+    if [ "${percent_place}" ]; then
+      coordx=`echo $2 | sed 's/%\?$/%/'`
+      coordy=`echo $3 | sed 's/%\?$/%/'`
+      sizew=`echo $4 | sed 's/%\?$/%/'`
+      sizeh=`echo $5 | sed 's/%\?$/%/'`
+    else
+      coordx=`echo $2 | sed 's/^0$/0%/'`
+      coordy=`echo $3 | sed 's/^0$/0%/'`
+      sizew=`echo $4 | sed 's/^0$/0%/'`
+      sizeh=`echo $5 | sed 's/^0$/0%/'`
+    fi
     shift 5
     ;;
   --no-exec|-n)
@@ -201,9 +221,34 @@ case "$1" in
     shift
     ;;
   --list|-l)
-    # noexec="1
-
      # example : ./switch_to.sh -l '\.t\..*\.'
+     if [ "$2" ]; then
+       current="`xdotool getactivewindow`"
+       echo "${mag}WINDOWID ${gxt} PID    ${rs}${yol} WM_CLASS       ${yel} WM_NAME ${rs}"
+       echo "${mag}--------|${gxt}|------|${rs}${yol}|--------------|${yel}|--------${rs}"
+     xdotool search --onlyvisible --name "$2" | while read i
+     do
+       status="`xprop -id ${i} | egrep '_NET_WM_NAME|WM_CLASS|_NET_WM_DESKTOP'`"
+       progclass="`echo \"${status}\" | grep 'WM_CLASS' | cut -d'=' -f2- `"
+       progname="`echo \"${status}\" | grep '_NET_WM_NAME' | cut -d'=' -f2- `"
+       activ="`echo \"${status}\" | grep '_NET_WM_DESKTOP' `"
+       PID="`xdotool getwindowpid ${i}`"
+       if [ "${activ}" ]; then
+         if [ "${current}" = "${i}" ];then
+         echo "=${mag}${i} ${gxt} ${PID} ${rs}${yol} ${progclass} ${yel} ${progname} ${rs}"
+         else
+         echo "${mag}${i} ${gxt} ${PID} ${rs}${yol} ${progclass} ${yel} ${progname} ${rs}"
+         fi
+       fi
+     done
+   echo
+   fi
+   list="1"
+   shift 2
+   ;;
+  --next|-next|-ln)
+     # same as above but switch on first encountered
+     # example : ./switch_to.sh -ln '\.t\..*\.'
      if [ "$2" ]; then
        echo "${mag}WINDOWID ${gxt} PID    ${rs}${yol} WM_CLASS       ${yel} WM_NAME ${rs}"
        echo "${mag}--------|${gxt}|------|${rs}${yol}|--------------|${yel}|--------${rs}"
@@ -215,18 +260,23 @@ case "$1" in
        activ="`echo \"${status}\" | grep '_NET_WM_DESKTOP' `"
        PID="`xdotool getwindowpid ${i}`"
        if [ "${activ}" ]; then
-         echo "${mag}${i} ${gxt} ${PID} ${rs}${yol} ${progclass} ${yel} ${progname} ${rs}"
+           echo "${mag}${i} ${gxt} ${PID} ${rs}${yol} ${progclass} ${yel} ${progname} ${rs}"
+           xdotool windowactivate ${i}
+         break
        fi
      done
+   shift
+   echo
    fi
-   exit 0
-   # shift
+   next="1"
+   shift
    ;;
  *)
    break
    ;;
 esac
 done
+if [ "${list}${next}" ]; then exit 0;fi
 ### Processing
 # last 2 args : Window name and program
 wname="$1"
@@ -276,8 +326,8 @@ if [ -n "${wname}" ];then
     echo "${LAST_ACTIVE_WID}" > ${LAST_ACTIVE_WID_file}
   fi
   if [ -n "${force_resize}" -a -n "${not_back}" -a -n "${change_coord}" -a -n "${window_to_activate}" ]; then
-    xdotool windowmove ${window_to_activate} ${coord}
-    xdotool windowsize ${window_to_activate} ${winsize}
+    xdotool windowmove ${window_to_activate} ${coordx} ${coordy}
+    xdotool windowsize ${window_to_activate} ${sizew} ${sizeh}
   fi
 elif [ -z "${noexec}" ]; then
   echo "No window name provided. Exit." && exit 1
@@ -285,8 +335,8 @@ else
   # if no parameter, process the current window
   window_to_activate="`xdotool getactivewindow`"
   if [ -n "${force_resize}" -a  -n "${change_coord}" -a -n "${window_to_activate}" ]; then
-      xdotool windowmove ${window_to_activate} ${coord}
-      xdotool windowsize ${window_to_activate} ${winsize}
+    xdotool windowmove ${window_to_activate} ${coordx} ${coordy}
+    xdotool windowsize ${window_to_activate} ${sizew} ${sizeh}
   fi
 fi
 #####################
