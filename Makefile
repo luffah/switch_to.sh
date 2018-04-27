@@ -15,4 +15,3 @@ install:deps test
 
 uninstall:
 	sudo rm -i /usr/local/bin/switch_to.sh
-

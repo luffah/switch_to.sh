@@ -1,11 +1,34 @@
 # switch_to.sh
 A simple script that allows to jump to a nammed window in Xorg and to jump back to the original window.
 ```
-Usage : switch_to.sh [-m x y w h][-t|--terminal] <app_name> [<app_cmd>]
-	-t|--terminal	auto title a terminal with the suffix <app_name>
-	-m|--move	move/resize (X,Y,width,height e.g. 0 50% 50% 100%)
-	<app_name>	shall be a quoted string if it contains spac
-	<app_cmd>	can contain %title which will be remplaced by <app_name> or the title of the window when the option -t is provided
+Usage : switch_to.sh  <app_name> 
+      : switch_to.sh  <app_name> <app_cmd>
+      : switch_to.sh [<options>] <app_name> [<app_cmd>]
+      : switch_to.sh [-m <x> <y> <w> <h>] [-t]  <app_name> [<app_cmd>]
+
+Arguments :
+ <app_name>	either executable, window title or window class
+           	-> shall be a quoted string if it contains any space
+
+ <app_cmd>	command line for launching the application
+          	-> can contain %title which will be remplaced by
+          	   the window title (<app_name> or
+          	   the title computed when using option -t)
+
+Options :
+ -t |--terminal	auto name a terminal ".t.<app_name>."
+ -tp|--terminal-prefix	change the terminal prefix (".t.")
+ -ts|--terminal-suffix	change the terminal suffix (".")
+ -m |--move	<x> <y> <w> <h>
+          	move/resize (X,Y,width,height e.g. 0 50% 50% 100%)
+ -p |--place	[new window] move/resize (X,Y,width,height e.g. 0 50% 50% 100%)
+ -d |--delay	[new window] delay before switching to or resizing the window (0.6s)
+ -n |--no-exec	don't create any new window
+Tricky options :
+ --percent	[before --move or --place] force coordonates in percent
+ -mc|-pc	short options for '--percent --move' and '--percent --place'
+ -l|--list	list windows (with optionnal pattern)
+ -ln|--next	jump to next window (with optionnal pattern)
 ```
 
 # Installation
@@ -31,19 +54,11 @@ Too, the alternatives are quite good.
 
 Do we need a future ?
 
-#### Using wmctrl (GPL) -> no, already done
-Using `wmctrl` with `xprop -root | grep "_NET_ACTIVE_WINDOW(WINDOW)"`, [brocket](https://github.com/dmikalova/brocket) well do the job.
+#### Using wmctrl (GPL)
+Using `wmctrl` instead of `xdotool` could radically shorten the script, but imply refactoring. 
 
-It could be interesting to propose terminal auto namming and jump back features to brocket maintainer. There's job on documenting too.
+#### Using Xdo (BSD) 
+Using `xdo` instead of `xdotool` offer a chance to simplify the code while keeping the structure. 
 
-#### Using Xdo (BSD) -> no, because there is EWMH
-An other alternative could be using `xdo` which only manipulate windows knowing the window id. Anyway with xprop, you can have the window list and informations. 
-```
-#Window list with xprop
-xprop -root | grep "_NET_CLIENT_LIST_STACKING(WINDOW)" `
-#Window information with xprop
-xprop -id <window_id> | grep "(STRING)"
-```
-
-#### Using EWMH (LPL) with python -> maybe
+#### Using EWMH (LPL) with python
 A cool python library nammed [python-emwh](https://github.com/parkouss/pyewmh) shall do the work faster than a simple bash script.
