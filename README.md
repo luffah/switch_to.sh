@@ -1,42 +1,56 @@
 # switch_to.sh
 A simple script that allows to jump to a nammed window in Xorg and to jump back to the original window.
-```
-Usage : switch_to.sh  <app_name> 
-      : switch_to.sh  <app_name> <app_cmd>
-      : switch_to.sh [<options>] <app_name> [<app_cmd>]
-      : switch_to.sh [-m <x> <y> <w> <h>] [-t]  <app_name> [<app_cmd>]
+```sh
+# Usage : switch_to.sh [<options>] <app_name> [<app_cmd>]
 
-Arguments :
- <app_name>	either executable, window title or window class
-           	-> shall be a quoted string if it contains any space
+# Go to firefox window.
+# If not existing: launch it
+switch_to.sh firefox firefox
+# which is equivalent to
+switch_to.sh firefox
 
- <app_cmd>	command line for launching the application
-          	-> can contain %title which will be remplaced by
-          	   the window title (<app_name> or
-          	   the title computed when using option -t)
+# Go to firefox window.
+# If not existing:
+# - open a launch eponym process
+# - remove decoration (-u)
+switch_to.sh -u firefox
 
-Options :
- -t |--terminal	auto name a terminal ".t.<app_name>."
- -tp|--terminal-prefix	change the terminal prefix (".t.")
- -ts|--terminal-suffix	change the terminal suffix (".")
- -m |--move	<x> <y> <w> <h>
-          	move/resize (X,Y,width,height e.g. 0 50% 50% 100%)
- -p |--place	[new window] move/resize (X,Y,width,height e.g. 0 50% 50% 100%)
- -d |--delay	[new window] delay before switching to or resizing the window (0.6s)
- -n |--no-exec	don't create any new window
-Tricky options :
- --percent	[before --move or --place] force coordonates in percent
- -mc|-pc	short options for '--percent --move' and '--percent --place'
- -l|--list	list windows (with optionnal pattern)
- -ln|--next	jump to next window (with optionnal pattern)
+# Go to the terminal nammed ".t.starting with a shell."
+# If not existing:
+# - open a new terminal ( -t in -ut )
+# - remove decoration ( -u in -ut ) 
+# - move/resize it to right ( place with percentage in -pc)
+switch_to.sh -pc 50 0 50 100  -ut "starting with a shell"
+
+# Go to Bla bla nammed window.
+# If not existing: change the name property of the active window
+switch_to.sh "Bla bla"  xprop -id "\${current_active_wid}" -set WM_NAME  "Bla bla"
+
+# Go to firefox window.
+# If not existing: Go to epiphany window
+#                  If not existing : echo a message
+switch_to.sh firefox switch_to.sh epiphany echo ":("
+
+# Get window ids
+switch_to.sh -l
 ```
 
 # Installation
-```make install```
-will ask to synaptic to install ```xdotool``` 
-and then will run a test and install the script in ```/usr/local/bin/```
+`make install`
+will ask to synaptic to install `xdotool`
+and then will run a test and install the script in `/usr/local/bin/`
 
-```make uninstall``` remove the script from ```/usr/local/bin/```
+
+`make uninstall` remove the script from `/usr/local/bin/`
+
+
+Important note : `xdotool` can't find `gnome-terminal` since it is not managed by X.
+In order to have a title in `gnome-terminal`, you may add this line to your bashrc.
+```
+if [ "${WINDOW_NAME}" ];then
+  echo -ne "\033]0;${WINDOW_NAME}\007"
+fi
+```
 
 # Alternatives
 * [wmctrl](http://tripie.sweb.cz/utils/wmctrl/)
