@@ -33,6 +33,9 @@ switch_to.sh firefox switch_to.sh epiphany echo ":("
 
 # Get window ids
 switch_to.sh -l
+
+# or to navigate between window
+switch_to.sh --dmenu
 ```
 
 # Installation
@@ -62,7 +65,7 @@ fi
 * [run-or-raise - position.org](http://fr.positon.org/tag/wmctrl) : it uses both `wmctrl` and `xdotool` 
 
 # And the future
-The question will be about performance of using xdotool (BSD).
+The question will be about performance of using xdotool (BSD) and about implementing an 'exposé'.
 
 Too, the alternatives are quite good.
 
