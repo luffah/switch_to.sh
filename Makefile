@@ -1,7 +1,16 @@
+ifndef TARGET
+  TARGET=/usr/local/bin/switch_to.sh
+endif
+
+DO=
+ifeq (${USER},$(stat -c "%U" -d ${TARGET}))
+	DO=sudo
+endif
+
 default: help
 
 deps: ## Install dependencies
-	sh ./install/deps.sh
+	which xdotool || ${DO} apt install xdotool
 
 test: ## Run a test with a xterm window
 	sh ./switch_to.sh -d .1 -pcu 0 0 50 50 -t "Testing script switch_to.sh"  \
@@ -24,12 +33,11 @@ test: ## Run a test with a xterm window
  sh ./switch_to.sh -mc 0 50 50 50 -i -rd -t "Testing script switch_to.sh" && sleep 2
  
 
-install:deps test ## install to /usr/local/bin/
-	sudo cp ./switch_to.sh /usr/local/bin/switch_to.sh
-	sudo chmod 755 /usr/local/bin/switch_to.sh
-
-uninstall: ## uninstall from /usr/local/bin/
-	sudo rm -i /usr/local/bin/switch_to.sh
+install:deps test ## install to ${TARGET} (/usr/local/bin/)
+	${DO} (cp ./switch_to.sh ${TARGET}; chmod 755 ${TARGET})
+	
+uninstall: ## uninstall from ${TARGET} (/usr/local/bin/)
+	${DO} rm -i ${TARGET}
 
 help: ## Show this help
 	@sed -n \

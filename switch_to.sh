@@ -19,7 +19,7 @@
 # logfile="/tmp/switch_to.log"
 logfile="/dev/stderr"
 # Put something inside DEBUG to have logs
-# DEBUG=y
+DEBUG=y
 DEBUG="${DEBUG:-}"
 
 logthis(){
@@ -391,7 +391,7 @@ while true; do
       setup_styles
       # current="`xdotool getactivewindow`"
       test -n "${LISTHEADER}" && echo "${LISTHEADER}"
-      xdotool search ${onlyvisible} --name "${pattern}" | filter_alive \
+      xdotool search ${onlyvisible} --name --class "${pattern}" | filter_alive \
         | while read i; do
       # _MOTIF_WM_HINTS says window is decorated or not
       # status="`xprop -id ${i} | egrep '_NET_WM_NAME|WM_CLASS|_MOTIF_WM_HINTS|_NET_WM_WINDOW_TYPE`"
@@ -442,6 +442,9 @@ while true; do
   noexec="1"
   switch_to_window=""
   ;;
+-fs|--fulscreen)
+  maximized="1"
+  ;;
 *)
   break
   ;;
@@ -486,16 +489,17 @@ if [ "${wname}" ];then
       logthis "Term mode: ${termmode}"
       if [ "${force_compatible_term}" ]; then
         case ${defterm} in
-          lxterminal|st|mate-terminal|xterm);;
+          lxterminal|st|mate-terminal*|xterm|xfce4-terminal*);;
           *)
             ok="`${defterm} --help 2> /dev/null | grep -- -T`"
             if [ -z "${ok}" ]
             then
-              which st > /dev/null && defterm=st || \
-                which lxterminal > /dev/null && defterm=lxterminal  || \
-                which mate-terminal > /dev/null && defterm=xterm || \
-                which xterm > /dev/null && defterm=xterm
-            fi
+              which st && defterm=st || \
+                which xfce4-terminal && defterm=xfce4-terminal  || \
+                which lxterminal && defterm=lxterminal  || \
+                which mate-terminal && defterm=mate-terminal || \
+                which xterm && defterm=xterm
+            fi > /dev/null
             ;;
         esac
       fi
@@ -503,7 +507,10 @@ if [ "${wname}" ];then
         st)
           opt="-t \"${wname}\" -c ${wname}"
           ;;
-        lxterminal|mate-terminal|xterm)
+        mate-terminal*)
+          opt="-t \"${wname}\""
+          ;;
+        *)
           opt="-T \"${wname}\""
           ;;
       esac
@@ -532,11 +539,11 @@ if [ "${wname}" ];then
     LAST_ACTIVE_WID="`[ -f ${LAST_ACTIVE_WID_file} ] && cat \"${LAST_ACTIVE_WID_file}\"`"
     ####
   fi
-  wname_reg="`echo \"${wname}\" | sed 's/\([.*]\)/\\\\\1/g'`"
-  activate_window || \
-    window_to_activate="`xdotool search  ${onlyvisible} -classname \"${wname_reg}\" | select_window`" \
+  # wname_reg="`echo \"${wname}\" | sed 's/\([.*]\)/\\1/g'`"
+  # activate_window || \
+    window_to_activate="`xdotool search  ${onlyvisible} --class \"${wname}\" | select_window`" \
     activate_window || \
-    window_to_activate="`xdotool search  ${onlyvisible} -name \"${wname_reg}\" | select_window`" \
+    window_to_activate="`xdotool search  ${onlyvisible} --name \"${wname}\" | select_window`" \
     activate_window || \
     test -n "${noexec}" || new_window
   LAST_ACTIVE_WID="${current_active_wid}"
@@ -589,6 +596,10 @@ if [ -n "${new_win}${force_resize}" -a -n "${not_back}" -a -n "${coordx}${coordy
   if [ "${sizew}${sizeh}" ];then
      xdotool windowsize ${window_to_activate} ${sizew} ${sizeh}
   fi
+fi
+
+if [ -n "${new_win}" -a -n "${maximized}" ]; then
+  wmctrl -r :ACTIVE: -b toggle,maximized_vert,maximized_horz 2> /dev/null
 fi
 
 if [ "${invert_colors}" ]; then
