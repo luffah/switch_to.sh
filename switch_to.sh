@@ -535,15 +535,15 @@ if [ "${wname}" ];then
   if [ -z "${noexec}" ]; then
     ## import globals ###
     # Window to activate if are already and the asked window (switch)
-    LAST_ACTIVE_WID_file="/tmp/LAST_`echo ${wname} | tr -d '\\ /'`_WID"
-    LAST_ACTIVE_WID="`[ -f ${LAST_ACTIVE_WID_file} ] && cat \"${LAST_ACTIVE_WID_file}\"`"
+    LAST_ACTIVE_WID_file="/tmp/LAST_$(echo "${wname}" | tr -d '\\ /')_WID"
+    LAST_ACTIVE_WID="$([ -f ${LAST_ACTIVE_WID_file} ] && cat "${LAST_ACTIVE_WID_file}")"
     ####
   fi
-  # wname_reg="`echo \"${wname}\" | sed 's/\([.*]\)/\\1/g'`"
+  wname_re="$(echo "${wname}" | sed 's/\([.*]\)/\\\1/g')"
   # activate_window || \
-    window_to_activate="`xdotool search  ${onlyvisible} --class \"${wname}\" | select_window`" \
+  window_to_activate="$(xdotool search  ${onlyvisible} --class "${wname_re}" | select_window)" \
     activate_window || \
-    window_to_activate="`xdotool search  ${onlyvisible} --name \"${wname}\" | select_window`" \
+    window_to_activate="$(xdotool search  ${onlyvisible} --name "${wname_re}" | select_window)" \
     activate_window || \
     test -n "${noexec}" || new_window
   LAST_ACTIVE_WID="${current_active_wid}"
