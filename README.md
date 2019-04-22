@@ -55,10 +55,13 @@ if [ "${WINDOW_NAME}" ];then
 fi
 ```
 
+# Known issues
+- `swicth_to.sh` can't list applications openned in `i3`, use `switch_to.py` instead
+
 # Alternatives
 * [wmctrl](http://tripie.sweb.cz/utils/wmctrl/)
 
-  `switch_to.sh` is slightly equivalent to `wmctrl -a <app_name> | <app_cmd>` with the difference that `wmctrl` doesn't (currently) allow to jump back to the previous window. 
+  `switch_to.sh` is slightly equivalent to `wmctrl -a <app_name> || <app_cmd>` with the difference that `wmctrl` doesn't (currently) allow to jump back to the previous window. 
 * [brocket](https://github.com/dmikalova/brocket) : it uses `wmctrl` and `xprop`
 
   `switch_to.sh` does less things that `brocket` but this one doesn't jump back too...

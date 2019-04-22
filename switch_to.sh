@@ -41,12 +41,11 @@ getch() {
 prompt(){
    printf "%s\r" "${rev} Press a key to continue or 'q' to quit.${rs}"
    ch=`getch`
-   if [ "${ch}" = 'q' ]; then
      printf "%s\r" "                                               "
+   if [ "${ch}" = 'q' ]; then
      echo
      exit 0
    fi
-   printf "%s\r" "                                               "
 }
 usage(){
   setup_colors
