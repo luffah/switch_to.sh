@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/usr/bin/env python3
 # Switch_to.py
 # --
 # Simple script that allows to jump to between named windows
@@ -22,10 +22,36 @@ logfile = sys.stderr
 
 DEBUG = os.environ.get('DEBUG', True)
 
+def _exec(oscmd):
+    return os.popen(oscmd).read().strip()
+
+def logthis(txt, *args):
+    if DEBUG:
+        print("{0} {1}".format(
+            datetime.now(), txt.format(*args)), file=logfile)
+
+class Colors():
+    color_tab = {}
+
+    def __get_attr__(self, n):
+        return color_tab[n]
+
+    def __set_attr__(self, n, val):
+        color_tab[n] = val
+
+    def __init__(self):
+        self.grt = _exec('tput setaf 2; tput bold; tput smul')
+        self.gre = _exec('tput setf 2; tput bold; tput rmul')
+        self.rev = _exec('tput bold; tput rev')
+        self.mag = _exec('tput setaf 5')
+        self.yel = _exec('tput setaf 3')
+        self.yol = _exec('tput setaf 6')
+        self.rs = _exec('tput sgr0')
+
+color = Colors()
 
 def _ensure_str(name):
     return '' if not isinstance(name, str) else name
-
 
 class _EWMH(EWMH):
 
@@ -73,33 +99,25 @@ class _EWMH(EWMH):
 
         return ret[0] if ret else None
 
+    def getWindowFromStr(self, name, re_mode):
+        w = self.getWindowByName(name)
+        if not w:
+            w = self.getWindowByClassName(name)
+        if re_mode:
+            if not w:
+                w = self.getWindowByNameRe(name)
+            if not w:
+                w = self.getWindowByClassNameRe(name)
+        return w
 
-class Colors():
-    color_tab = {}
-
-    def __get_attr__(self, n):
-        return color_tab[n]
-
-    def __set_attr__(self, n, val):
-        color_tab[n] = val
-
-    def __init__(self):
-        self.grt = _exec('tput setaf 2; tput bold; tput smul')
-        self.gre = _exec('tput setf 2; tput bold; tput rmul')
-        self.rev = _exec('tput bold; tput rev')
-        self.mag = _exec('tput setaf 5')
-        self.yel = _exec('tput setaf 3')
-        self.yol = _exec('tput setaf 6')
-        self.rs = _exec('tput sgr0')
-
-def _exec(oscmd):
-    return os.popen(oscmd).read().strip()
-
-def logthis(txt, *args):
-    if DEBUG:
-        print("{0} {1}".format(
-            datetime.now(), txt.format(*args)), file=logfile)
-
+    def showWindowList(self):
+        curr = self.getActiveWindow()
+        for w in self.getClientList():
+            print("%s%-40s %-40s%s" % (
+                color.rev if w.id == curr.id else "",
+                w.get_wm_name(), w.get_wm_class(),
+                color.rs
+            ))
 
 def getch():
     fd = sys.stdin.fileno()
@@ -111,15 +129,11 @@ def getch():
         termios.tcsetattr(fd, termios.TCSADRAIN, rs)
     return ch
 
-
-colors = Colors()
-
-
 def prompt():
     sys.stdout.write(
         "{0}\r".format(
             "{0} Press a key to continue or 'q' to quit.{1}".format(
-                colors.rev, colors.rs
+                color.rev, color.rs
             )
         )
     )
@@ -128,14 +142,32 @@ def prompt():
     if ch == 'q':
         exit(0)
 
+def _translate(s):
+    return s.replace(
+        ' ','').replace(
+            '/','')
 
-def activate_window(w):
+def activate_window(name, w):
     if not w:
         return False
+    logthis("current_active_wid={0}", current_active_win.id)
     logthis('window_to_activate={0}', w.id)
 
-    if not force_resize and w.id == current_active_win.id:
-        w = ewmh.getWindowById(last_active_winid)
+    last_active_wid_fpath = "/tmp/LAST_%s_WID" % _translate(opt.name)
+
+    if w.id == current_active_win.id:
+        try:
+            with open(last_active_wid_fpath, 'r') as f:
+                last_active_winid = f.read().strip()
+        except FileNotFoundError:
+            return w
+
+        logthis('last_active_winid={0}', last_active_winid)
+        if last_active_winid:
+            w = ewmh.getWindowById(int(last_active_winid))
+    else:
+        with open(last_active_wid_fpath, 'w') as f:
+             f.write(str(current_active_win.id))
 
     if w:
         logthis('window_to_activate={0}', w.id)
@@ -145,6 +177,8 @@ def activate_window(w):
 
 
 def new_window(name, tcmd):
+    logthis("Name     : {0}", name)
+    logthis("Command  : {0}", " ".join(tcmd))
     env = os.environ.copy()
     env['WINDOW_NAME'] = name
     env['TERM'] = ''
@@ -189,6 +223,18 @@ current_active_win = ewmh.getActiveWindow()
 activation_delay = 1
 
 if __name__ == '__main__':
+    def _finalize_opts(opt, args):
+        wname = args[0]
+        opt.cmd = args[1:]
+        if not wname:
+            exit(1)
+        if opt.termname:
+            opt.termmode = True
+        if opt.termmode:
+            wname = (opt.termname or default_termname) % wname
+        opt.re_mode = '.' in wname or '*' in wname
+        opt.name = wname
+
     from optparse import OptionParser
     parser = OptionParser()
     parser.set_description('Jump between windows')
@@ -202,37 +248,21 @@ if __name__ == '__main__':
         '-T', '--terminal-name', action='store_const',
         dest='termname', default=None,
         help='open a terminal nammed using a printf like parameter')
+    parser.add_option(
+        '-l', '--list', action='store_true',
+        dest='do_list', default=None,
+        help='list windows')
     # parser.add_option('-c','--xbb',action='store_const',const=2,dest='c', default=False)
     (opt, args) = parser.parse_args()
-    wname = args[0]
-    tcmd = args[1:]
-    if not wname:
-        exit(1)
-    re_mode = '.' in wname or '*' in wname
-    if opt.termname:
-        opt.termmode = True
-    if opt.termmode:
-        wname = (opt.termname or default_termname) % wname
+    if opt.do_list:
+        ewmh.showWindowList()
+        exit()
+    _finalize_opts(opt, args)
+    window_to_activate = ewmh.getWindowFromStr(opt.name, opt.re_mode)
 
-    logthis("current_active_wid={0}", current_active_win.id)
-
-    window_to_activate = ewmh.getWindowByName(wname)
-    if not window_to_activate:
-        window_to_activate = ewmh.getWindowByClassName(wname)
-    if re_mode:
-        if not window_to_activate:
-            window_to_activate = ewmh.getWindowByNameRe(wname)
-        if not window_to_activate:
-            window_to_activate = ewmh.getWindowByClassNameRe(wname)
-
-    # FIXME : use sockets or sqlite to keep last active_win
     if window_to_activate:
-        activate_window(window_to_activate)
+        activate_window(opt.name, window_to_activate)
     else:
-        activate_window(window_to_activate)
-        if not tcmd:
-            if opt.termmode:
-                tcmd = get_term_open_cmd(wname)
-        logthis("Name     : {0}", wname)
-        logthis("Command  : {0}", " ".join(tcmd))
-        new_window(wname, tcmd)
+        if opt.termmode and not opt.cmd:
+            opt.cmd = get_term_open_cmd(opt.name)
+        new_window(opt.name, opt.cmd)

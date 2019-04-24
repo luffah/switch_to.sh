@@ -1,5 +1,9 @@
+ifndef TARGETDIR
+  TARGETDIR=/usr/local/bin
+endif
+
 ifndef TARGET
-  TARGET=/usr/local/bin/switch_to.sh
+  TARGET=${TARGETDIR}/switch_to.sh
 endif
 
 DO=
@@ -33,8 +37,11 @@ test: ## Run a test with a xterm window
  sh ./switch_to.sh -mc 0 50 50 50 -i -rd -t "Testing script switch_to.sh" && sleep 2
  
 
+install_py: ## install py version to ${TARGETDIR} (/usr/local/bin/)
+	${DO} cp --preserve=mode ./switch_to.py ${TARGETDIR}/
+	
 install:deps test ## install to ${TARGET} (/usr/local/bin/)
-	${DO} (cp ./switch_to.sh ${TARGET}; chmod 755 ${TARGET})
+	${DO} cp  --preserve=mode ./switch_to.sh ${TARGET}
 	
 uninstall: ## uninstall from ${TARGET} (/usr/local/bin/)
 	${DO} rm -i ${TARGET}
