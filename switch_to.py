@@ -237,6 +237,7 @@ if __name__ == '__main__':
 
     from optparse import OptionParser
     parser = OptionParser()
+    parser.allow_interspersed_args = False
     parser.set_description('Jump between windows')
     parser.set_usage('{0} [option] name [cmd]'.format(sys.argv[0]))
     parser.add_option(
