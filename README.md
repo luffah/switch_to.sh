@@ -1,5 +1,5 @@
 # switch_to.sh
-A simple script that allows to jump to a nammed window in Xorg and to jump back to the original window.
+A script to simply jump to a nammed window in Xorg and to jump back to the original window.
 ```sh
 # Usage : switch_to.sh [<options>] <app_name> [<app_cmd>]
 
@@ -59,26 +59,20 @@ fi
 - `swicth_to.sh` can't list applications openned in `i3`, use `switch_to.py` instead
 
 # Alternatives
-* [wmctrl](http://tripie.sweb.cz/utils/wmctrl/)
+* with [wmctrl](http://tripie.sweb.cz/utils/wmctrl/)
 
-  `switch_to.sh` is slightly equivalent to `wmctrl -a <app_name> || <app_cmd>` with the difference that `wmctrl` doesn't (currently) allow to jump back to the previous window. 
+  a simple run or raise : `wmctrl -a <app_name> || <app_cmd>`
+
 * [brocket](https://github.com/dmikalova/brocket) : it uses `wmctrl` and `xprop`
 
-  `switch_to.sh` does less things that `brocket` but this one doesn't jump back too...
-* [run-or-raise - position.org](http://fr.positon.org/tag/wmctrl) : it uses both `wmctrl` and `xdotool` 
+* [run-or-raise - position.org](http://fr.positon.org/tag/wmctrl) : it uses both `wmctrl` and `xdotool`
 
-# And the future
-The question will be about performance of using xdotool (BSD) and about implementing an 'exposé'.
+`switch_to.sh` does less things but none jump back to previously used window.
 
-Too, the alternatives are quite good.
 
-Do we need a future ?
+# TODO
+`switch_to` started from the `.sh` script. It does the job, but `xdotool` weight too much.
 
-#### Using wmctrl (GPL)
-Using `wmctrl` instead of `xdotool` could radically shorten the script, but imply refactoring. 
-
-#### Using Xdo (BSD) 
-Using `xdo` instead of `xdotool` offer a chance to simplify the code while keeping the structure. 
-
-#### Using EWMH (LPL) with python
-A cool python library nammed [python-emwh](https://github.com/parkouss/pyewmh) shall do the work faster than a simple bash script.
+2 possibilities:
+* refactoring `switch_to.sh` using `wmctrl` (GPL) instead of `xdotool` shall radically shorten the code.
+* implementing `switch_to.py` using `ewmh` (LPGL) in order to interact with EWMH standard (like `wmctrl`).

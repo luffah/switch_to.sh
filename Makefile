@@ -1,4 +1,4 @@
-ifndef TARGETDIR
+ifndef TARGETDI2
   TARGETDIR=/usr/local/bin
 endif
 
@@ -36,9 +36,19 @@ test: ## Run a test with a xterm window
  sleep .2 && \
  sh ./switch_to.sh -mc 0 50 50 50 -i -rd -t "Testing script switch_to.sh" && sleep 2
  
+testpy: ## Run a test with a xterm window
+	./switch_to.py -p 0,0,50c,50c -t "Testing script switch_to"  \
+ xterm -e 'sleep 0.8; echo Testing window placement;sleep 1; echo Testing window list; ./switch_to.py -l ; echo Now the installation can start;sleep 2' && \
+	sleep .2 && \
+ ./switch_to.py -m 0,11% -t "Testing script switch_to" && \
+	sleep .2 && \
+ ./switch_to.py -m 0,22% -t "Testing script switch_to" && \
+	sleep .2 && \
+	./switch_to.py -m 0,33% -t "Testing script switch_to"
+ 
 
-install_py: ## install py version to ${TARGETDIR} (/usr/local/bin/)
-	${DO} cp --preserve=mode ./switch_to.py ${TARGETDIR}/
+installpy: ## install py version to ${TARGETDIR} (/usr/local/bin/)
+	${DO} cp --preserve=mode ./switch_to.py ${TARGETDIR}/switch_to
 	
 install:deps test ## install to ${TARGET} (/usr/local/bin/)
 	${DO} cp  --preserve=mode ./switch_to.sh ${TARGET}
