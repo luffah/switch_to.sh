@@ -117,11 +117,15 @@ class _EWMH(EWMH):
         if not proc.pid:
             return None
         logthis("PID={0}", proc.pid)
+        # FIXME: find a less agressive way to get the new window
         while True:
             time.sleep(0.01)
             w = self.getWindowByPid(proc.pid)
             if w and w.id in [w.id for w in self.getClientList()]:
                 return w
+            new_active_win = self.getActiveWindow()
+            if new_active_win.id != current_active_win.id:
+                return new_active_win
 
     def activateWindow(self, win, name, opt):
         current_active_win = self.getActiveWindow()
@@ -228,15 +232,20 @@ class _EWMH(EWMH):
             _printlist(self.getClientList())
 
     def placeWindow(self, win, coord):
+        if not re.match("([-+*/]?[0-9.]+[%c]?[, ]?)+", coord):
+            logthis('unexpected coordonates : "{0}"',  coord)
+            return
+
         g = win.get_geometry()
-        c_win = [g.x, g.y, g.width, g.height]
+        g_abs = g.root.translate_coords(win, g.x, g.y)
+        c_win = [g_abs.x, g_abs.y, g.width, g.height]
         c_desk = list(self.getDesktopGeometry()) * 2
 
         def _eval(c, i):
             if not c:
                 return c_win[i]
             b = ""
-            if re.match('^[-+*]', c):
+            if re.match('^[-+*/]', c):
                 b = str(c_win[i])
             elif 'c' in c or '%' in c:
                 b = str(c_desk[i])
@@ -247,11 +256,11 @@ class _EWMH(EWMH):
 
         (x, y, width, height) = [_eval(c, i) for i, c in
                                  enumerate(
-            (re.findall("[-+*/]?\d+[%c]?", coord)
+            (re.findall("[-+*/]?[0-9.]+[%c]?", coord)
              + [None] * 4)[:4])
         ]
-        logthis('move window ' + coord)
-        self.setMoveResizeWindow(w, x=x, y=y, w=width, h=height)
+        logthis('move window {0} by {1}', win.get_wm_name(), coord)
+        self.setMoveResizeWindow(win, x=max([x-g.x,0]), y=max([y-g.y,0]), w=width, h=height)
 
 # def getch():
 #     fd = sys.stdin.fileno()
@@ -394,14 +403,15 @@ def main():
     else:
         w = ewmh.getActiveWindow()
         state_change = _state_change['oncurrent']
+        if opt.move:
+            ewmh.placeWindow(w, opt.move)
 
     if opt.fullscreen:
         ewmh.setWmState(w, state_change['fullscreen'],
                         '_NET_WM_STATE_FULLSCREEN')
     if opt.maximize:
         ewmh.setWmState(w, state_change['maximize'],
-                        '_NET_WM_STATE_MAXIMIZED_VERT')
-        ewmh.setWmState(w, state_change['maximize'],
+                        '_NET_WM_STATE_MAXIMIZED_VERT',
                         '_NET_WM_STATE_MAXIMIZED_HORZ')
     ewmh.commit()
 
