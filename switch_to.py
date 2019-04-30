@@ -118,14 +118,14 @@ class _EWMH(EWMH):
             return None
         logthis("PID={0}", proc.pid)
         # FIXME: find a less agressive way to get the new window
-        while True:
-            time.sleep(0.01)
+        for i in range(30):
             w = self.getWindowByPid(proc.pid)
             if w and w.id in [w.id for w in self.getClientList()]:
                 return w
             new_active_win = self.getActiveWindow()
             if new_active_win.id != current_active_win.id:
                 return new_active_win
+            time.sleep(0.1)
 
     def activateWindow(self, win, name, opt):
         current_active_win = self.getActiveWindow()
@@ -417,3 +417,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    exit(0)
