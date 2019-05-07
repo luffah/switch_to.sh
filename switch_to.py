@@ -26,7 +26,8 @@ DEBUG = os.environ.get('DEBUG', False)
 _term_groups = OrderedDict([
     ('st', (['st', 'stterm'],
             ["-t", "{0}", "-c", "{0}"])),
-    ('mate', (['lxterminal', 'mate-terminal', 'mate-terminal.wrapper'],
+    ('mate', (['lxterminal', 'mate-terminal', 'mate-terminal.wrapper',
+               'sakura'],
               ["-t", "{0}"])),
     ('*', (['xterm', 'rxvt', 'xfce4-terminal', 'lxterm', 'koi8rxterm', 'mlterm',
             'uxterm', 'xfce4-terminal.wrapper', 'terminator'],
@@ -117,15 +118,16 @@ class _EWMH(EWMH):
         if not proc.pid:
             return None
         logthis("PID={0}", proc.pid)
-        # FIXME: find a less agressive way to get the new window
-        for i in range(30):
+        for i in range(60):
             w = self.getWindowByPid(proc.pid)
-            if w and w.id in [w.id for w in self.getClientList()]:
+            if w:
                 return w
-            new_active_win = self.getActiveWindow()
-            if new_active_win.id != current_active_win.id:
-                return new_active_win
-            time.sleep(0.1)
+            else:
+                time.sleep(0.1)
+            if i > 10:
+                new_active_win = self.getActiveWindow()
+                if new_active_win.id != current_active_win.id:
+                    return new_active_win
 
     def activateWindow(self, win, name, opt):
         current_active_win = self.getActiveWindow()
@@ -188,7 +190,7 @@ class _EWMH(EWMH):
     def getWindowByPid(self, pid):
         return _first(
             w for w in self.getClientList()
-            if self.getWmPid(w) == pid
+            if self.getWmPid(w) == pid and w.id
         )
 
     def getWindowFromStr(self, name, opt):
@@ -260,7 +262,9 @@ class _EWMH(EWMH):
              + [None] * 4)[:4])
         ]
         logthis('move window {0} by {1}', win.get_wm_name(), coord)
-        self.setMoveResizeWindow(win, x=max([x-g.x,0]), y=max([y-g.y,0]), w=width, h=height)
+        self.setMoveResizeWindow(win, x=max([x-g.x,0]), y=max([y-g.y,0]),
+                w=(width-g.x), h=(height-g.y))
+        self.commit()
 
 # def getch():
 #     fd = sys.stdin.fileno()
