@@ -22,6 +22,10 @@ from ewmh import EWMH
 
 logfile = sys.stderr
 DEBUG = os.environ.get('DEBUG', False)
+# If you need constant debugging:
+# logfile = open('/tmp/switch_to.log', 'a')
+# print('-' * 40, file=logfile)
+# DEBUG = True
 
 _term_groups = OrderedDict([
     ('st', (['st', 'stterm'],
@@ -106,13 +110,14 @@ class _EWMH(EWMH):
         env['TERM'] = ''
 
         current_active_win = self.getActiveWindow()
-        if opt.leave_fullscreen_on_focus_change:
-            fullscreen = self.getWmState(current_active_win,
-                                         '_NET_WM_STATE_FULLSCREEN')
-            if fullscreen:
-                self.setWmState(current_active_win, 0,
-                                '_NET_WM_STATE_FULLSCREEN')
-        self._LastActiveWin(name, write=current_active_win)
+        if current_active_win:
+            if opt.leave_fullscreen_on_focus_change:
+                fullscreen = self.getWmState(current_active_win,
+                                             '_NET_WM_STATE_FULLSCREEN')
+                if fullscreen:
+                    self.setWmState(current_active_win, 0,
+                                    '_NET_WM_STATE_FULLSCREEN')
+            self._LastActiveWin(name, write=current_active_win)
 
         proc = subprocess.Popen(tcmd or name, env=env)
         if not proc.pid:
@@ -126,25 +131,27 @@ class _EWMH(EWMH):
                 time.sleep(0.1)
             if i > 10:
                 new_active_win = self.getActiveWindow()
-                if new_active_win.id != current_active_win.id:
+                if (new_active_win and (
+                    not current_active_win or
+                    new_active_win.id != current_active_win.id
+                    )):
                     return new_active_win
 
     def activateWindow(self, win, name, opt):
         current_active_win = self.getActiveWindow()
-        logthis("current_active_wid={0}", current_active_win.id)
-        logthis('window_to_activate={0}', win.id)
-
-        if win.id == current_active_win.id:
-            try:
-                win = self._LastActiveWin(name)
-            except:
-                return win
-        else:
-            self._LastActiveWin(name, write=current_active_win)
+        if current_active_win:
+            logthis("current_active_wid={0}", current_active_win.id)
+            if win.id == current_active_win.id:
+                try:
+                    win = self._LastActiveWin(name)
+                except:
+                    return win
+            else:
+                self._LastActiveWin(name, write=current_active_win)
 
         if win:
             logthis('window_to_activate={0}', win.id)
-            if opt.leave_fullscreen_on_focus_change:
+            if current_active_win and opt.leave_fullscreen_on_focus_change:
                 fullscreen = self.getWmState(current_active_win,
                                             '_NET_WM_STATE_FULLSCREEN')
                 if fullscreen:

@@ -16,10 +16,8 @@
 
 ### extra functionnalities require compton and dmenu
 
-# logfile="/tmp/switch_to.log"
 logfile="/dev/stderr"
 # Put something inside DEBUG to have logs
-DEBUG=y
 DEBUG="${DEBUG:-}"
 
 logthis(){
