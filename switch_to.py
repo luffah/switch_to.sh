@@ -16,7 +16,6 @@ import re
 # import termios
 import subprocess
 from datetime import datetime
-from collections import OrderedDict
 from optparse import OptionParser
 from ewmh import EWMH
 
@@ -27,7 +26,7 @@ DEBUG = os.environ.get('DEBUG', False)
 # print('-' * 40, file=logfile)
 # DEBUG = True
 
-_term_groups = OrderedDict([
+_term_groups = [
     ('st', (['st', 'stterm'],
             ["-t", "{0}", "-c", "{0}"])),
     ('mate', (['lxterminal', 'mate-terminal', 'mate-terminal.wrapper',
@@ -36,15 +35,11 @@ _term_groups = OrderedDict([
     ('*', (['xterm', 'rxvt', 'xfce4-terminal', 'lxterm', 'koi8rxterm', 'mlterm',
             'uxterm', 'xfce4-terminal.wrapper', 'terminator'],
            ["-T", "{0}"]))
-])
+]
 default_termname = '.t.%s.'
 
 def _exec(oscmd):
     return os.popen(oscmd).read().strip()
-
-def _first(gen):
-    li = list(gen)
-    return li[0] if li else None
 
 def logthis(txt, *args):
     if DEBUG:
@@ -101,6 +96,17 @@ class _EWMH(EWMH):
             if not win:
                 raise Exception('WindowNotFound')
             return win
+
+    def _first(self, gen):
+        li = list(gen)
+        if not li:
+            return None
+        elif len(li) == 1:
+            return li[0]
+        else:
+            d = self.getCurrentDesktop()
+            return sorted(li, key=lambda w: abs(d-self.getWmDesktop(w)))[0]
+
 
     def newWindow(self, name, tcmd, opt):
         logthis("Name     : {0}", name)
@@ -177,25 +183,25 @@ class _EWMH(EWMH):
             a for a in classes if re.match(name, a, rx)) or name in classes
 
     def getWindowById(self, win_id):
-        return _first(
+        return self._first(
             w for w in self.getClientList()
             if w.id == win_id
         )
 
     def getWindowByName(self, name, rx=None):
-        return _first(
+        return self._first(
             w for w in self.getClientList()
             if self._testSearchByName(name, w, rx)
         )
 
     def getWindowByClassName(self, name, rx=None):
-        return _first(
+        return self._first(
             w for w in self.getClientList()
             if self._testSearchByClassName(name, w, rx)
         )
 
     def getWindowByPid(self, pid):
-        return _first(
+        return self._first(
             w for w in self.getClientList()
             if self.getWmPid(w) == pid and w.id
         )
@@ -302,14 +308,14 @@ def get_term_open_cmd(name):
     defterm = _exec(
         'readlink /etc/alternatives/x-terminal-emulator | xargs basename'
     )
-    all_terms = [t for t in sum([tg[0] for tg in _term_groups.values()], [])]
+    all_terms = [t for t in sum([tg[1][0] for tg in _term_groups], [])]
     if defterm not in all_terms:
         if not _exec(defterm + ' --help 2> /dev/null | grep -- -T'):
             for t in all_terms:
                 if _exec('which ' + t):
                     defterm = t
                     break
-    for (terms, optformat) in _term_groups.values():
+    for (_, (terms, optformat)) in _term_groups:
         if defterm in terms:
             opts = [o.format(name) for o in optformat]
     logthis("Using -- {0} {1} --", defterm, " ".join(opts))
