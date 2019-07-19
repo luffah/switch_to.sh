@@ -13,7 +13,6 @@ import sys
 import time
 import tty
 import re
-# import termios
 import subprocess
 from datetime import datetime
 from optparse import OptionParser
@@ -38,8 +37,10 @@ _term_groups = [
 ]
 default_termname = '.t.%s.'
 
+
 def _exec(oscmd):
     return os.popen(oscmd).read().strip()
+
 
 def logthis(txt, *args):
     if DEBUG:
@@ -59,12 +60,16 @@ class Colors():
         'yol': ('setaf 6',),
     }
 
+    def __init__(self, opt):
+        self.with_colors = opt.with_colors
+
     def __getattr__(self, name):
+        if not self.with_colors:
+            return ""
         if not name in self.color_tab and name in self._color_tab:
             self.color_tab[name] = _exec(
                 ";".join(['tput ' + o for o in self._color_tab[name]]))
         return self.color_tab[name]
-
 
 
 class _EWMH(EWMH):
@@ -75,19 +80,14 @@ class _EWMH(EWMH):
     def commit(self):
         self.display.flush()
 
-    def _LastActiveWin(self, name, write=False):
-        def _translate(name):
-            return name.replace(
-                ' ', '').replace(
-                    '/', '')
-
-        last_active_wid_fpath = "/tmp/LAST_%s_WID" % _translate(name)
+    def _LastActiveWin(self, identifier, write=False):
+        last_active_wid_fpath = "/tmp/LAST_%s_WID" % identifier
         if write:
             with open(last_active_wid_fpath, 'w') as f:
                 f.write(str(write.id))
         else:
-            win=None
-            last_active_winid=None
+            win = None
+            last_active_winid = None
             with open(last_active_wid_fpath, 'r') as f:
                 last_active_winid = f.read().strip()
                 logthis('last_active_winid={0}', last_active_winid)
@@ -107,7 +107,6 @@ class _EWMH(EWMH):
             d = self.getCurrentDesktop()
             return sorted(li, key=lambda w: abs(d-self.getWmDesktop(w)))[0]
 
-
     def newWindow(self, name, tcmd, opt):
         logthis("Name     : {0}", name)
         logthis("Command  : {0}", " ".join(tcmd))
@@ -123,48 +122,61 @@ class _EWMH(EWMH):
                 if fullscreen:
                     self.setWmState(current_active_win, 0,
                                     '_NET_WM_STATE_FULLSCREEN')
-            self._LastActiveWin(name, write=current_active_win)
 
         proc = subprocess.Popen(tcmd or name, env=env)
         if not proc.pid:
             return None
+
         logthis("PID={0}", proc.pid)
-        for i in range(60):
-            w = self.getWindowByPid(proc.pid)
-            if w:
-                return w
-            else:
+
+        if proc._child_created:
+            while not proc.poll():
+                w = self.getWindowByPid(proc.pid)
+                if w:
+                    break
                 time.sleep(0.1)
-            if i > 10:
-                new_active_win = self.getActiveWindow()
-                if (new_active_win and (
+        else:
+            w = self.getWindowByPid(proc.pid)
+
+        if w:
+            self.setActiveWindow(w)
+        elif w:  # extreme case : the process died and disown
+            time.sleep(1)
+            new_active_win = self.getActiveWindow()
+            if (new_active_win and (
                     not current_active_win or
                     new_active_win.id != current_active_win.id
-                    )):
-                    return new_active_win
+            )):
+                w = new_active_win
 
-    def activateWindow(self, win, name, opt):
+        if w and current_active_win:
+            self._LastActiveWin(w.id, write=current_active_win)
+        return w
+
+    def activateWindow(self, win, opt):
         current_active_win = self.getActiveWindow()
+        if not win:
+            return None
+
         if current_active_win:
             logthis("current_active_wid={0}", current_active_win.id)
             if win.id == current_active_win.id:
                 try:
-                    win = self._LastActiveWin(name)
+                    win = self._LastActiveWin(win.id)
                 except:
                     return win
             else:
-                self._LastActiveWin(name, write=current_active_win)
+                self._LastActiveWin(win.id, write=current_active_win)
 
-        if win:
-            logthis('window_to_activate={0}', win.id)
-            if current_active_win and opt.leave_fullscreen_on_focus_change:
-                fullscreen = self.getWmState(current_active_win,
-                                            '_NET_WM_STATE_FULLSCREEN')
-                if fullscreen:
-                    self.setWmState(current_active_win, 0,
+        logthis('window_to_activate={0}', win.id)
+        if current_active_win and opt.leave_fullscreen_on_focus_change:
+            fullscreen = self.getWmState(current_active_win,
+                                         '_NET_WM_STATE_FULLSCREEN')
+            if fullscreen:
+                self.setWmState(current_active_win, 0,
                                 '_NET_WM_STATE_FULLSCREEN')
 
-            self.setActiveWindow(win)
+        self.setActiveWindow(win)
 
         return win
 
@@ -179,8 +191,12 @@ class _EWMH(EWMH):
 
     def _testSearchByClassName(self, name, win, rx):
         classes = win.get_wm_class()
-        return rx is not None and any(
-            a for a in classes if re.match(name, a, rx)) or name in classes
+        if rx:
+            return any(a for a in classes if re.match(name, a, rx))
+        else:
+            if name.islower():
+                classes = [a.lower() for a in classes]
+            return  name in classes
 
     def getWindowById(self, win_id):
         return self._first(
@@ -216,33 +232,42 @@ class _EWMH(EWMH):
             )
         )
 
-    def showWindowList(self, opt):
-        color = Colors()
-        curr = self.getActiveWindow()
+    def getWinInfo(self, w):
+        infos = {}
+        infos['pid'] = self.getWmPid(w)
+        infos['class'] = ' | '.join(w.get_wm_class())
+        infos['name'] = w.get_wm_name()
+        infos['id'] = w.id
+        infos['xid'] = "0x%.8x" % w.id
+        return infos
 
-        def _printrow(*args, hl=False, title=False):
-            print("%s%-5s%-16s%-16s %-50s%s" % (
-                hl and color.rev or title and color.bold or "",
-                *args, color.rs))
+    def showWindowList(self, opt):
+        color = Colors(opt)
+        curr = self.getActiveWindow()
+        print_format = {"xid": 10, "id": 8, "pid": 5, "class": 16, "name": 50}
+        column_names = ['pid', 'name']
 
         def _printlist(wins):
+            fmt = ""
+            for c in column_names:
+                fmt += "{%s:%d} " % (c, print_format[c])
+            fmt = fmt[:-1] + color.rs
             if opt.list_with_header:
-                _printrow('Pid', 'Class', '', 'Name', title=True)
+                print(color.bold + fmt.format(
+                    **{k: k.capitalize() for k in column_names}))
             for win in wins:
-                _printrow(
-                    self.getWmPid(win),
-                    * win.get_wm_class(),
-                    win.get_wm_name(),
-                    hl=(win.id == curr.id)
-                )
-
+                print((win.id == curr.id and color.rev or "") +
+                      fmt.format(**self.getWinInfo(win))
+                      )
+        if opt.column_names:
+            column_names = opt.column_names.split(',')
 
         if opt.search_name:
             name = opt.search_name
             _printlist([win for win in self.getClientList()
-                  if self._testSearchByClassName(name, win, opt.re_flag) or
-                  self._testSearchByClassName(name, win,  opt.re_flag)
-                  ])
+                        if self._testSearchByClassName(name, win, opt.re_flag) or
+                        self._testSearchByClassName(name, win,  opt.re_flag)
+                        ])
         else:
             _printlist(self.getClientList())
 
@@ -275,34 +300,10 @@ class _EWMH(EWMH):
              + [None] * 4)[:4])
         ]
         logthis('move window {0} by {1}', win.get_wm_name(), coord)
-        self.setMoveResizeWindow(win, x=max([x-g.x,0]), y=max([y-g.y,0]),
-                w=(width-g.x), h=(height-g.y))
+        self.setMoveResizeWindow(win, x=max([x-g.x, 0]), y=max([y-g.y, 0]),
+                                 w=(width-g.x), h=(height-g.y))
         self.commit()
 
-# def getch():
-#     fd = sys.stdin.fileno()
-#     rs = termios.tcgetattr(fd)
-#     try:
-#         tty.setraw(sys.stdin.fileno())
-#         ch = sys.stdin.read(1)
-#     finally:
-#         termios.tcsetattr(fd, termios.TCSADRAIN, rs)
-#     return ch
-#
-#
-# def prompt():
-#     sys.stdout.write(
-#         "{0}\r".format(
-#             "{0} Press a key to continue or 'q' to quit.{1}".format(
-#                 color.rev, color.rs
-#             )
-#         )
-#     )
-#     ch = getch()
-#     sys.stdout.write("${0}\r".format(" "*47))
-#     if ch == 'q':
-#         exit(0)
-#
 
 def get_term_open_cmd(name):
     defterm = _exec(
@@ -320,6 +321,7 @@ def get_term_open_cmd(name):
             opts = [o.format(name) for o in optformat]
     logthis("Using -- {0} {1} --", defterm, " ".join(opts))
     return [defterm] + opts
+
 
 def main():
     ewmh = _EWMH()
@@ -348,6 +350,11 @@ def main():
     parser.add_option(
         '-T', '--terminal-name', action='store', dest='termname', default=None,
         help='open a terminal nammed using a printf like parameter')
+    # Id search
+    parser.add_option(
+        '-P', '--pid', action='store', dest='search_pid', default=None)
+    parser.add_option(
+        '-I', '--id', action='store', dest='search_id', default=None)
     # Regexp search
     parser.add_option(
         '-r', '--regex', action='store', dest='regex', default=None,
@@ -361,7 +368,14 @@ def main():
         '-l', '--list', action='store_true', dest='do_list', default=None,
         help='list windows')
     parser.add_option(
+        '-c', '--columns', action='store', dest='column_names', default=None,
+        help='e.g. id,xid,pid,class,name'
+    )
+    parser.add_option(
         '-H', '--no-header', action='store_false', dest='list_with_header',
+        default=True)
+    parser.add_option(
+        '-C', '--no-colors', action='store_false', dest='with_colors',
         default=True)
     # Place window
     parser.add_option(
@@ -393,6 +407,12 @@ def main():
             if opt.termmode:
                 wname = (opt.termname or default_termname) % wname
             opt.name = wname
+            if not opt.search_id and re.match(r"^\d{8}\d*$", opt.name):
+                opt.search_id = opt.name
+        if opt.search_pid:
+            opt.search_pid = int(opt.search_pid)
+        if opt.search_id:
+            opt.search_id = int(opt.search_id)
         opt.search_name = opt.regex or opt.name
         if opt.re_flag is not None:
             opt.regex = True
@@ -404,13 +424,18 @@ def main():
     if opt.do_list:
         ewmh.showWindowList(opt)
         exit()
-    w = ewmh.getWindowFromStr(opt.search_name, opt)
+    if opt.search_id:
+        w = ewmh.getWindowById(opt.search_id)
+    elif opt.search_pid:
+        w = ewmh.getWindowByPid(opt.search_pid)
+    elif opt.search_name:
+        w = ewmh.getWindowFromStr(opt.search_name, opt)
     state_change = _state_change['onfound']
     if w:
         if opt.move:
             ewmh.placeWindow(w, opt.move)
         else:
-            ewmh.activateWindow(w, opt.search_name, opt)
+            ewmh.activateWindow(w, opt)
     elif opt.name:
         if opt.termmode and not opt.cmd:
             opt.cmd = get_term_open_cmd(opt.name)
@@ -431,6 +456,7 @@ def main():
                         '_NET_WM_STATE_MAXIMIZED_VERT',
                         '_NET_WM_STATE_MAXIMIZED_HORZ')
     ewmh.commit()
+
 
 if __name__ == '__main__':
     main()

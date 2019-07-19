@@ -11,9 +11,6 @@
 ###
 ###  Last Update : 07.06.2018
 
-### require XdoTool but not eternally
-### most operations could benefit of change to xdo
-
 ### extra functionnalities require compton and dmenu
 
 logfile="/dev/stderr"

@@ -1,16 +1,51 @@
-# switch_to.sh
+# switch_to
 A script to simply jump to a nammed window in Xorg and to jump back to the original window.
+
 ```sh
-# Usage : switch_to.sh [<options>] <app_name> [<app_cmd>]
+Usage : switch_to [<options>] <app_name> [<app_cmd>]
 
 # Go to firefox window.
 # If not existing: launch it
-switch_to.sh firefox firefox
+switch_to firefox firefox
+
 # which is equivalent to
-switch_to.sh firefox
+switch_to firefox
+
+# list windows
+switch_to -l
 
 # Go to firefox window.
+# If not existing: Go to epiphany window
+#                  If not existing : echo a message
+switch_to firefox switch_to epiphany echo ":("
+```
+
+There is 2 versions :
+- python (new/clean)
+  - use EWMH lib
+  - works in `i3`
+  - faster to start/jump heavy applications (like `firefox`)
+- sh (old/tricky)
+  - use `xdotool` (for searching windows)
+  - use `xprop` for WM_HINTS (decorations...)
+  - use optionnaly `wmctrl` to toggle maximisation and fullscreen
+  - use optionnaly `compton` to reverse screen color
+  - use optionnaly `dmenu` to select window
+  - eye candy
+  - faster to jump on applications
+
+## specific to switch_to.py
+```sh
+
+# Go to the terminal nammed ".t.starting with a shell."
 # If not existing:
+# - open a new terminal ( -t )
+# - move/resize it to right ( place with percentage in -pc)
+switch_to.py -p 50c 0 50c 100c  -t "starting with a shell"
+```
+## specific to switch_to.sh
+```sh
+# If firefox window  not exist:
 # - open a launch eponym process
 # - remove decoration (-u)
 switch_to.sh -u firefox
@@ -26,13 +61,6 @@ switch_to.sh -pc 50 0 50 100  -ut "starting with a shell"
 # If not existing: change the name property of the active window
 switch_to.sh "Bla bla"  xprop -id "\${current_active_wid}" -set WM_NAME  "Bla bla"
 
-# Go to firefox window.
-# If not existing: Go to epiphany window
-#                  If not existing : echo a message
-switch_to.sh firefox switch_to.sh epiphany echo ":("
-
-# Get window ids
-switch_to.sh -l
 
 # or to navigate between window
 switch_to.sh --dmenu
@@ -68,11 +96,3 @@ fi
 * [run-or-raise - position.org](http://fr.positon.org/tag/wmctrl) : it uses both `wmctrl` and `xdotool`
 
 `switch_to.sh` does less things but none jump back to previously used window.
-
-
-# TODO
-`switch_to` started from the `.sh` script. It does the job, but `xdotool` weight too much.
-
-2 possibilities:
-* refactoring `switch_to.sh` using `wmctrl` (GPL) instead of `xdotool` shall radically shorten the code.
-* implementing `switch_to.py` using `ewmh` (LPGL) in order to interact with EWMH standard (like `wmctrl`).

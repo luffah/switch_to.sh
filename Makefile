@@ -1,22 +1,15 @@
-ifndef TARGETDI2
+ifndef TARGETDIR
   TARGETDIR=/usr/local/bin
-endif
-
-ifndef TARGET
-  TARGET=${TARGETDIR}/switch_to.sh
-endif
-
-DO=
-ifeq (${USER},$(stat -c "%U" -d ${TARGET}))
-	DO=sudo
 endif
 
 default: help
 
 deps: ## Install dependencies
-	which xdotool || ${DO} apt install xdotool
+	which xdotool || apt install xdotool
 
-test: ## Run a test with a xterm window
+test: testsh testpy ## Test scripts with xterm window
+
+testsh: ## Run a test with a xterm window
 	sh ./switch_to.sh -d .1 -pcu 0 0 50 50 -t "Testing script switch_to.sh"  \
  xterm -e 'sleep 0.8; echo Testing window placement;sleep 1; echo Testing window list; sh ./switch_to.sh -l . ; echo Now the installation can start;sleep 2' && \
 	sleep .2 && \
@@ -37,24 +30,24 @@ test: ## Run a test with a xterm window
  sh ./switch_to.sh -mc 0 50 50 50 -i -rd -t "Testing script switch_to.sh" && sleep 2
  
 testpy: ## Run a test with a xterm window
-	./switch_to.py -p 0,0,50c,50c -t "Testing script switch_to"  \
+	./switch_to.py -p 0,0,50c,50c -t "Testing script switch_to.py"  \
  xterm -e 'sleep 0.8; echo Testing window placement;sleep 1; echo Testing window list; ./switch_to.py -l ; echo Now the installation can start;sleep 2' && \
 	sleep .2 && \
- ./switch_to.py -m 0,11% -t "Testing script switch_to" && \
+ ./switch_to.py -m 0,11% -t "Testing script switch_to.py" && \
 	sleep .2 && \
- ./switch_to.py -m 0,22% -t "Testing script switch_to" && \
+ ./switch_to.py -m 0,22% -t "Testing script switch_to.py" && \
 	sleep .2 && \
-	./switch_to.py -m 0,33% -t "Testing script switch_to"
+	./switch_to.py -m 0,33% -t "Testing script switch_to.py"
  
 
-installpy: ## install py version to ${TARGETDIR} (/usr/local/bin/)
-	${DO} cp --preserve=mode ./switch_to.py ${TARGETDIR}/switch_to
+install: ## install to ${TARGETDIR} (/usr/local/bin/)
+	cp  --preserve=mode ./switch_to.sh ${TARGETDIR} &&\
+	cp  --preserve=mode ./switch_to.py ${TARGETDIR} &&\
+	ln -s ${TARGETDIR}/switch_to.py ${TARGETDIR}/switch_to
 	
-install:deps test ## install to ${TARGET} (/usr/local/bin/)
-	${DO} cp  --preserve=mode ./switch_to.sh ${TARGET}
-	
-uninstall: ## uninstall from ${TARGET} (/usr/local/bin/)
-	${DO} rm -i ${TARGET}
+uninstall: ## uninstall from ${TARGETDIR} (/usr/local/bin/)
+	rm -i ${TARGETDIR}/switch_to ${TARGETDIR}/switch_to.py  ${TARGETDIR}/switch_to.sh 
+
 
 help: ## Show this help
 	@sed -n \
