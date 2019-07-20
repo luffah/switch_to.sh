@@ -22,17 +22,37 @@ switch_to firefox switch_to epiphany echo ":("
 
 There is 2 versions :
 - python (new/clean)
+  - performances:
+    - 0.2s to jump to an existing window
+    - 0.4s for a new terminal
+    - 1.5s for a navigator
+  - works with any window manage that is EWMH compliant
   - use EWMH lib
-  - works in `i3`
-  - faster to start/jump heavy applications (like `firefox`)
+  - customizable output
 - sh (old/tricky)
-  - use `xdotool` (for searching windows)
-  - use `xprop` for WM_HINTS (decorations...)
-  - use optionnaly `wmctrl` to toggle maximisation and fullscreen
-  - use optionnaly `compton` to reverse screen color
-  - use optionnaly `dmenu` to select window
-  - eye candy
-  - faster to jump on applications
+  - preformances:
+    - 0.1s to jump to an existing window
+    - 1.5s for a new terminal
+    - 2.5s for a navigator
+  - works with any window manager that works well with xdotool
+  - use `xdotool` (for searching windows), `xprop` for WM_HINTS (decorations...) and optionnaly : `wmctrl` to toggle maximisation and fullscreen; `compton` to reverse screen color; `dmenu` to select window
+  - colorfull output
+
+The table below describe compatibility between script version and window manager.
+
+| Window Manager | switch_to.sh            | switch_to.py                               |
+|----------------|-------------------------|--------------------------------------------|
+|  bspwm         | OK                      | OK                                         |
+| compiz         | not tested              | not tested                                 |
+| fluxbox        | not tested              | not tested                                 |
+| gnome          | OK                      | not tested                                 |
+| herbstluftwm   | OK                      | Require to set focus_stealing_prevention 0 |
+| i3             | don't work with monocle | OK                                         |
+| kde/plasma     | not tested              | not tested                                 |
+| openbox        | OK                      | OK                                         |
+| xfce           | OK                      | OK                                         |
+
+Note: automatic window placement shall not work with a tiling window manager.
 
 ## specific to switch_to.py
 ```sh
@@ -84,7 +104,9 @@ fi
 ```
 
 # Known issues
-- `swicth_to.sh` can't list applications openned in `i3`, use `switch_to.py` instead
+- `switch_to.sh` can't list applications openned in `i3`, use `switch_to.py` instead
+- the both versions are not compliant (example `-i` means "ignore case" in py version, and "invert color" in sh version)
+- `switch_to.py` move the target window in current workspace instead of jumping to the target window workspace
 
 # Alternatives
 * with [wmctrl](http://tripie.sweb.cz/utils/wmctrl/)
