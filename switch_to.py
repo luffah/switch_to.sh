@@ -129,8 +129,11 @@ class _EWMH(EWMH):
 
         logthis("PID={0}", proc.pid)
 
+        w = None
         if proc._child_created:
-            while not proc.poll():
+            for i in range(100):  # try to poll during 10s
+                if not proc.poll():
+                    break
                 w = self.getWindowByPid(proc.pid)
                 if w:
                     break
@@ -176,8 +179,17 @@ class _EWMH(EWMH):
                 self.setWmState(current_active_win, 0,
                                 '_NET_WM_STATE_FULLSCREEN')
 
+        if not opt.bring_window_here:
+            curdesktop = self.getCurrentDesktop()
+            d = self.getWmDesktop(win)
+            if curdesktop != d:
+                self.setCurrentDesktop(d)
+                self.display.flush()
+                time.sleep(0.1)
+
         self.setActiveWindow(win)
 
+        self.display.flush()
         return win
 
     def getWmName(self, win):
@@ -395,6 +407,12 @@ def main():
     )
     parser.add_option(
         '-M', '--maximize', action='store_true', dest='maximize',
+        default=None
+    )
+    parser.add_option(
+        '-b', '--bring', action='store_true',
+        dest='bring_window_here',
+        help='bring window in current workspace',
         default=None
     )
 

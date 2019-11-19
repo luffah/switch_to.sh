@@ -106,7 +106,6 @@ fi
 # Known issues
 - `switch_to.sh` can't list applications openned in `i3`, use `switch_to.py` instead
 - the both versions are not compliant (example `-i` means "ignore case" in py version, and "invert color" in sh version)
-- `switch_to.py` move the target window in current workspace instead of jumping to the target window workspace
 
 # Alternatives
 * with [wmctrl](http://tripie.sweb.cz/utils/wmctrl/)
@@ -117,4 +116,4 @@ fi
 
 * [run-or-raise - position.org](http://fr.positon.org/tag/wmctrl) : it uses both `wmctrl` and `xdotool`
 
-`switch_to.sh` does less things but none jump back to previously used window.
+`switch_to` does less things but none jump back to previously used window.
