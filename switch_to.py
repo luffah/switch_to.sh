@@ -203,12 +203,14 @@ class _EWMH(EWMH):
 
     def _testSearchByClassName(self, name, win, rx):
         classes = win.get_wm_class()
+        if not classes:
+            return False
         if rx:
             return any(a for a in classes if re.match(name, a, rx))
         else:
             if name.islower():
                 classes = [a.lower() for a in classes]
-            return  name in classes
+            return name in classes
 
     def getWindowById(self, win_id):
         return self._first(
