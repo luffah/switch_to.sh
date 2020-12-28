@@ -35,7 +35,7 @@ _term_groups = [
             'uxterm', 'xfce4-terminal.wrapper', 'terminator'],
            ["-T", "{0}"]))
 ]
-default_termname = '.t.%s.'
+default_termname = os.environ.get('SWITCH_TO_TERM_CHAR', '#') + '%s'
 
 
 def _exec(oscmd):
