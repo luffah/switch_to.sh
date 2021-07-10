@@ -108,12 +108,14 @@ fi
 - the both versions are not compliant (example `-i` means "ignore case" in py version, and "invert color" in sh version)
 
 # Alternatives
-* with [wmctrl](http://tripie.sweb.cz/utils/wmctrl/)
-
-  a simple run or raise : `wmctrl -a <app_name> || <app_cmd>`
+* with [wmctrl](http://tripie.sweb.cz/utils/wmctrl/) (packaged on most distros) a simple run or raise : `wmctrl -a <app_name> || <app_cmd>`
 
 * [brocket](https://github.com/dmikalova/brocket) : it uses `wmctrl` and `xprop`
 
 * [run-or-raise - position.org](http://fr.positon.org/tag/wmctrl) : it uses both `wmctrl` and `xdotool`
 
-`switch_to` does less things but none jump back to previously used window.
+* [rofi](https://github.com/davatorium/rofi) (packaged on most distros) is the best alternative to the `--dmenu` option. If you just need to switch window by searching its name, use rofi.
+
+## Why should i use `switch_to` ?
+  1. to switch to a nammed window and easily jump back to the previous one (in your keybindings)
+  2. to transparently start and setup the application window
