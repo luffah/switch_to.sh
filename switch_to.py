@@ -194,7 +194,7 @@ class _EWMH(EWMH):
 
     def getWmName(self, win):
         # override
-        name = win.get_wm_name()
+        name = win.get_full_text_property(357) or win.get_wm_name()
         return '' if not isinstance(name, str) else name
 
     def _testSearchByName(self, name, win, rx):
@@ -248,9 +248,10 @@ class _EWMH(EWMH):
 
     def getWinInfo(self, w):
         infos = {}
-        infos['pid'] = self.getWmPid(w)
-        infos['class'] = ' | '.join(w.get_wm_class())
-        infos['name'] = w.get_wm_name()
+        infos['pid'] = self.getWmPid(w) 
+        infos['class'] = ','.join(w.get_wm_class()) or ''
+        infos['name'] = w.get_wm_name() or ''
+        infos['title'] = w.get_full_text_property(357) or ''
         infos['id'] = w.id
         infos['xid'] = "0x%.8x" % w.id
         return infos
@@ -258,8 +259,9 @@ class _EWMH(EWMH):
     def showWindowList(self, opt):
         color = Colors(opt)
         curr = self.getActiveWindow()
-        print_format = {"xid": 10, "id": 8, "pid": 5, "class": 16, "name": 50}
-        column_names = ['pid', 'name']
+        print_format = {"xid": 10, "id": 8, "pid": 5, "class": 50, "name": 50,
+                        "title": 64}
+        column_names = ['pid', 'class', 'title']
 
         def _printlist(wins):
             fmt = ""
@@ -319,7 +321,7 @@ class _EWMH(EWMH):
         self.commit()
 
 
-def get_term_open_cmd(name):
+def get_term_open_cmd(opt):
     defterm = _exec(
         'readlink /etc/alternatives/x-terminal-emulator | xargs basename'
     )
@@ -332,7 +334,13 @@ def get_term_open_cmd(name):
                     break
     for (_, (terms, optformat)) in _term_groups:
         if defterm in terms:
-            opts = [o.format(name) for o in optformat]
+            opts = [o.format(opt.name) for o in optformat]
+
+    if opt.termopts:
+        opts += opt.termopts.split(' ')
+    if opt.termexec:
+        opts += ['-e'] + opt.termexec.split(' ')
+
     logthis("Using -- {0} {1} --", defterm, " ".join(opts))
     return [defterm] + opts
 
@@ -364,6 +372,14 @@ def main():
     parser.add_option(
         '-T', '--terminal-name', action='store', dest='termname', default=None,
         help='open a terminal nammed using a printf like parameter')
+    parser.add_option(
+        '--t-e', '--terminal-exec', action='store', dest='termexec',
+        default=None,
+        help='start terminal with -e')
+    parser.add_option(
+        '--t-o', '--terminal-opts', action='store', dest='termopts',
+        default=None,
+        help='start terminal with opts')
     # Id search
     parser.add_option(
         '-P', '--pid', action='store', dest='search_pid', default=None)
@@ -422,7 +438,7 @@ def main():
         opt.name = None
         if args:
             (wname, opt.cmd) = (args[0], args[1:])
-            if opt.termname:
+            if opt.termexec or opt.termopts or opt.termname:
                 opt.termmode = True
             if opt.termmode:
                 wname = (opt.termname or default_termname) % wname
@@ -458,7 +474,7 @@ def main():
             ewmh.activateWindow(w, opt)
     elif opt.name:
         if opt.termmode and not opt.cmd:
-            opt.cmd = get_term_open_cmd(opt.name)
+            opt.cmd = get_term_open_cmd(opt)
         w = ewmh.newWindow(opt.name, opt.cmd, opt)
         if opt.coord:
             ewmh.placeWindow(w, opt.coord)
