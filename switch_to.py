@@ -192,14 +192,20 @@ class _EWMH(EWMH):
         self.display.flush()
         return win
 
-    def getWmName(self, win):
-        # override
-        name = win.get_full_text_property(357) or win.get_wm_name()
-        return '' if not isinstance(name, str) else name
+    # def getWmName(self, win):
+    #     # override
+    #     name = win.get_full_text_property(357) or win.get_wm_name()
+    #     return '' if not isinstance(name, str) else name
 
     def _testSearchByName(self, name, win, rx):
-        wname = self.getWmName(win)
-        return rx is not None and re.match(name, wname, rx) or name == wname
+        # wname = self.getWmName(win)
+        res = False
+        if rx is not None:
+            wname = win.get_full_text_property(357) or win.get_wm_name()
+            res = re.match(name, wname, rx)
+        else:
+            wname =  win.get_wm_name() or win.get_full_text_property(357)
+        return res or name == wname
 
     def _testSearchByClassName(self, name, win, rx):
         classes = win.get_wm_class()
