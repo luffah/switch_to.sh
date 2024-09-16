@@ -202,7 +202,7 @@ class _EWMH(EWMH):
         res = False
         if rx is not None:
             wname = win.get_full_text_property(357) or win.get_wm_name()
-            res = re.match(name, wname, rx)
+            res = re.match(name, wname, rx) if wname else False
         else:
             wname =  win.get_wm_name() or win.get_full_text_property(357)
         return res or name == wname
