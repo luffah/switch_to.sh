@@ -49,27 +49,49 @@ def logthis(txt, *args):
 
 
 class Colors():
-    color_tab = {}
+    cache_tput = {}
     _color_tab = {
-        'rs': ('sgr0',),
-        'bold': ('bold',),
-        'rev': ('bold', 'rev'),
-        'grt': ('setaf 2', 'bold', 'smul'),
-        'mag': ('setaf 5',),
-        'yel': ('setaf 3',),
-        'yol': ('setaf 6',),
+        'rs': [ 'sgr0', ],
+        'bold': [ 'bold', ],
+        'rev': [ 'bold', 'rev'],
+        'title': [ 'bold', 'smul'],
+        'grt': [ 'setaf 2', 'bold', 'smul' ],
+        'gre': [ 'setaf 2', 'bold', 'rmul' ],
+        'mag': [ 'setaf 5', ],
+        'yel': [ 'setaf 3', ],
+        'yol': [ 'setaf 6', ],
     }
+    cumul = []
 
     def __init__(self, opt):
         self.with_colors = opt.with_colors
 
-    def __getattr__(self, name):
+    def get(self, name):
         if not self.with_colors:
             return ""
-        if not name in self.color_tab and name in self._color_tab:
-            self.color_tab[name] = _exec(
-                ";".join(['tput ' + o for o in self._color_tab[name]]))
-        return self.color_tab[name]
+        colors = self._color_tab.get(name, [])
+        if 'sgr0' in colors:
+            self.cumul = []
+            newcolors = colors
+        else:
+            newcolors = ['sgr0'] + self.cumul + colors
+            self.cumul += [c for c in colors
+                           if c not in ['bold', 'smul', 'rmul', 'sgr0']
+                           or name == 'rev']
+
+        for o in newcolors:
+            if o not in self.cache_tput:
+                self.cache_tput[o] = _exec('tput ' + o)
+
+        # print(self.cumul)
+        # print(newcolors)
+        ret = ''.join(self.cache_tput[o] for o in newcolors)
+        # print(ret + "test")
+        return ret
+
+
+    def __getattr__(self, name):
+        return self.get(name)
 
 
 class _EWMH(EWMH):
@@ -106,6 +128,21 @@ class _EWMH(EWMH):
         else:
             d = self.getCurrentDesktop()
             return sorted(li, key=lambda w: abs(d-self.getWmDesktop(w)))[0]
+
+    def _closest(self, gen):
+        li = list(gen)
+        if not li:
+            return None
+        elif len(li) == 1:
+            return li
+        else:
+            d = self.getCurrentDesktop()
+            same_d = sorted([w for w in li if d == self.getWmDesktop(w)],
+                            key=lambda w: w.id
+                            )
+            if same_d:
+                return same_d
+            return sorted(li, key=lambda w: abs(d-self.getWmDesktop(w)))
 
     def newWindow(self, name, tcmd, opt):
         logthis("Name     : {0}", name)
@@ -156,20 +193,32 @@ class _EWMH(EWMH):
             self._LastActiveWin(w.id, write=current_active_win)
         return w
 
-    def activateWindow(self, win, opt):
+    def setActiveWindow(self, win):
+        # double launch to ensure window is really activated (Buggy with Mate)
+        super().setActiveWindow(win)
+        super().setActiveWindow(win)
+
+    def activateWindow(self, win_list, opt):
         current_active_win = self.getActiveWindow()
-        if not win:
+        if not win_list:
             return None
+
+        win = win_list[0]
 
         if current_active_win:
             logthis("current_active_wid={0}", current_active_win.id)
-            if win.id == current_active_win.id:
-                try:
-                    win = self._LastActiveWin(win.id)
-                except:
-                    return win
-            else:
-                self._LastActiveWin(win.id, write=current_active_win)
+            if current_active_win in win_list:
+                idx = win_list.index(current_active_win)
+                if (idx + 1) < len(win_list):
+                    win = win_list[idx+1]
+                else:
+                    try:
+                        win = self._LastActiveWin(win.id)
+                    except:
+                        return win
+            if win.id != current_active_win.id and current_active_win not in win_list:
+                for w in win_list:
+                    self._LastActiveWin(w.id, write=current_active_win)
 
         logthis('window_to_activate={0}', win.id)
         if current_active_win and opt.leave_fullscreen_on_focus_change:
@@ -225,19 +274,19 @@ class _EWMH(EWMH):
         )
 
     def getWindowByName(self, name, rx=None):
-        return self._first(
+        return self._closest(
             w for w in self.getClientList()
             if self._testSearchByName(name, w, rx)
         )
 
     def getWindowByClassName(self, name, rx=None):
-        return self._first(
+        return self._closest(
             w for w in self.getClientList()
             if self._testSearchByClassName(name, w, rx)
         )
 
     def getWindowByPid(self, pid):
-        return self._first(
+        return self._closest(
             w for w in self.getClientList()
             if self.getWmPid(w) == pid and w.id
         )
@@ -265,22 +314,30 @@ class _EWMH(EWMH):
     def showWindowList(self, opt):
         color = Colors(opt)
         curr = self.getActiveWindow()
-        print_format = {"xid": 10, "id": 8, "pid": 5, "class": 50, "name": 50,
-                        "title": 64}
-        column_names = ['pid', 'class', 'title']
-
+        print_format = {"xid": {'len': 10, 'color': 'mag'},
+                        "id": {'len': 8, 'color': 'gre'},
+                        "pid": {'len': 5, 'color': 'gre'},
+                        "class": {'len': 21, 'color': 'yol'},
+                        "name": {'len': 50, 'color': 'mag'},
+                        "title": {'len': 32, 'color': 'yel'}
+                        }
+        column_names = ['id', 'pid', 'class', 'title']
         def _printlist(wins):
-            fmt = ""
-            for c in column_names:
-                fmt += "{%s:%d} " % (c, print_format[c])
-            fmt = fmt[:-1] + color.rs
+            fmt = ' '.join("%s{%s:%d}" % (color.get(print_format[c]['color']), c, print_format[c]['len'])
+                    for c in column_names) + color.rs
+            fmttitle = ' '.join("%s{%s:%d}" % (color.get(print_format[c]['color']) + color.title, c, print_format[c]['len'])
+                    for c in column_names) + color.rs
+            fmtactiv = ' '.join("%s{%s:%d}" % (color.get(print_format[c]['color']) + color.rev, c, print_format[c]['len'])
+                    for c in column_names) + color.rs
             if opt.list_with_header:
-                print(color.bold + fmt.format(
+                print(color.bold + fmttitle.format(
                     **{k: k.capitalize() for k in column_names}))
             for win in wins:
-                print((win.id == curr.id and color.rev or "") +
-                      fmt.format(**self.getWinInfo(win))
-                      )
+                if win.id == curr.id:
+                    print(fmtactiv.format(**self.getWinInfo(win)))
+                else:
+                    print(fmt.format(**self.getWinInfo(win)))
+
         if opt.column_names:
             column_names = opt.column_names.split(',')
 
@@ -467,17 +524,18 @@ def main():
         ewmh.showWindowList(opt)
         exit()
     if opt.search_id:
-        w = ewmh.getWindowById(opt.search_id)
+        wl = ewmh.getWindowById(opt.search_id)
     elif opt.search_pid:
-        w = ewmh.getWindowByPid(opt.search_pid)
+        wl = ewmh.getWindowByPid(opt.search_pid)
     elif opt.search_name:
-        w = ewmh.getWindowFromStr(opt.search_name, opt)
+        wl = ewmh.getWindowFromStr(opt.search_name, opt)
     state_change = _state_change['onfound']
-    if w:
+    if wl:
         if opt.move:
-            ewmh.placeWindow(w, opt.move)
+            ewmh.placeWindow(wl[0], opt.move)
+            w = wl[0]
         else:
-            ewmh.activateWindow(w, opt)
+            w = ewmh.activateWindow(wl, opt)
     elif opt.name:
         if opt.termmode and not opt.cmd:
             opt.cmd = get_term_open_cmd(opt)
