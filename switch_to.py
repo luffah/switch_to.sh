@@ -17,6 +17,7 @@ import subprocess
 from datetime import datetime
 from optparse import OptionParser
 from ewmh import EWMH
+from Xlib import X, Xatom
 
 logfile = sys.stderr
 DEBUG = os.environ.get('DEBUG', False)
@@ -246,14 +247,28 @@ class _EWMH(EWMH):
     #     name = win.get_full_text_property(357) or win.get_wm_name()
     #     return '' if not isinstance(name, str) else name
 
+    def _win_text_property(self, win):
+        # workaround ewmh changes
+        if hasattr(win, 'get_full_text_property'):
+            return win.get_full_text_property(357)
+        else:
+            prop = win.get_full_property(357, X.AnyPropertyType)
+            if prop is None or prop.format != 9:
+                return None
+            if prop.property_type == Xatom.STRING:
+                prop.value = prop.value.decode(win._STRING_ENCODING)
+            elif prop.property_type == win.display.get_atom('UTF8_STRING'):
+                prop.value = prop.value.decode(win._UTF8_STRING_ENCODING)
+            return prop.value
+
     def _testSearchByName(self, name, win, rx):
         # wname = self.getWmName(win)
         res = False
         if rx is not None:
-            wname = win.get_full_text_property(357) or win.get_wm_name()
-            res = re.match(name, wname, rx) if wname else False
+            wname = self._win_text_property(win) or win.get_wm_name() or ''
+            res = re.match(name, str(wname), rx) if wname else False
         else:
-            wname =  win.get_wm_name() or win.get_full_text_property(357)
+            wname =  win.get_wm_name() or self._win_text_property(win) or ''
         return res or name == wname
 
     def _testSearchByClassName(self, name, win, rx):

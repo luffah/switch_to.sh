@@ -44,7 +44,7 @@ install: ## install to ${TARGETDIR} (/usr/local/bin/)
 	cp  --preserve=mode ./switch_to.sh ${TARGETDIR} &&\
 	cp  --preserve=mode ./switch_to.py ${TARGETDIR} &&\
 	unlink ${TARGETDIR}/switch_to || true &&\
-	ln -s ${TARGETDIR}/switch_to.py ${TARGETDIR}/switch_to
+	ln -s switch_to.py ${TARGETDIR}/switch_to
 	
 uninstall: ## uninstall from ${TARGETDIR} (/usr/local/bin/)
 	rm -i ${TARGETDIR}/switch_to ${TARGETDIR}/switch_to.py  ${TARGETDIR}/switch_to.sh 
